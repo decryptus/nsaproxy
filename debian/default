@@ -1,0 +1,5 @@
+# defaults file for nsaproxy
+
+# Service can be enabled by setting
+# NSAPROXY_ENABLE="yes"
+NSAPROXY_ENABLE="yes"

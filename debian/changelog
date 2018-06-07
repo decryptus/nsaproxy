@@ -1,0 +1,102 @@
+nsaproxy (0.1.15) unstable; urgency=medium
+
+  * Reviewed exclude behaviour.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Wed, 06 Jun 2018 16:31:52 +0200
+
+nsaproxy (0.1.14) unstable; urgency=medium
+
+  * Added method modules.pdns._refresh_apis.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Mon, 04 Jun 2018 14:19:50 +0200
+
+nsaproxy (0.1.13) unstable; urgency=medium
+
+  * Added nameservers on creation of zone.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Mon, 04 Jun 2018 12:34:03 +0200
+
+nsaproxy (0.1.12) unstable; urgency=medium
+
+  * Added possibility to add pdns api-key in configuration.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Tue, 29 May 2018 18:19:39 +0200
+
+nsaproxy (0.1.11) unstable; urgency=medium
+
+  * Fixed requirements.txt
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Fri, 25 May 2018 13:45:49 +0200
+
+nsaproxy (0.1.10) unstable; urgency=medium
+
+  * Release version: 0.1.10
+  * [BUG] Fixed create and delete
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Fri, 27 Apr 2018 18:14:38 +0200
+
+nsaproxy (0.1.9) unstable; urgency=medium
+
+  * Release version: 0.1.9
+  * [FEATURES] Added api_cache_flush and record SOA in cdns plugin
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Fri, 27 Apr 2018 13:13:10 +0200
+
+nsaproxy (0.1.8) unstable; urgency=medium
+
+  * Release version: 0.1.8
+  * Added file: etc/nsaproxy/nsaproxy.yml.example 
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Mon, 23 Apr 2018 12:00:55 +0200
+
+nsaproxy (0.1.7) unstable; urgency=medium
+
+  * Release version: 0.1.7
+  * Removed duplicated methods
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Mon, 23 Apr 2018 12:00:03 +0200
+
+nsaproxy (0.1.6) unstable; urgency=medium
+
+  * Release version: 0.1.6
+  * Added r53 cache.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Sun, 22 Apr 2018 02:34:58 +0200
+
+nsaproxy (0.1.5) unstable; urgency=medium
+
+  * Release version: 0.1.5
+  * Reviewed SRV record for cdns.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Sun, 22 Apr 2018 01:48:40 +0200
+
+nsaproxy (0.1.4) unstable; urgency=medium
+
+  * Release version: 0.1.4
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Fri, 20 Apr 2018 11:38:45 +0200
+
+nsaproxy (0.1.3) unstable; urgency=medium
+
+  * Added cdns cache.
+  * Release version: 0.1.3
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Fri, 20 Apr 2018 11:27:15 +0200
+
+nsaproxy (0.1.2) unstable; urgency=medium
+
+  * Release version: 0.1.2
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Wed, 18 Apr 2018 17:07:58 +0200
+
+nsaproxy (0.1.1) unstable; urgency=medium
+
+  * Release version: 0.1.1
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Thu, 12 Apr 2018 11:55:40 +0200
+
+nsaproxy (0.1.0) unstable; urgency=medium
+
+  * Initial release.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Thu, 12 Apr 2018 11:22:20 +0200

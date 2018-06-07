@@ -1,0 +1,8 @@
+boto3>=1.4.2
+cdnetworks
+dwho
+pycurl
+pyyaml>=3.10
+redis>=2.4.0
+requests
+sonicprobe
