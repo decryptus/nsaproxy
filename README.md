@@ -8,8 +8,8 @@ pip install nsaproxy
 
 ### Running daemon
 
-nsaproxy -c <conffile> -p <pidfile> --logfile <logfile>
+`nsaproxy -c <conffile> -p <pidfile> --logfile <logfile>`
 
 ### Running foreground
 
-nsaproxy -f -c <conffile> -p <pidfile> --logfile <logfile>
+`nsaproxy -f -c <conffile> -p <pidfile> --logfile <logfile>`

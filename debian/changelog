@@ -1,3 +1,9 @@
+nsaproxy (0.1.18) unstable; urgency=medium
+
+  * Fixed README.md
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Mon, 25 Jun 2018 11:20:21 +0200
+
 nsaproxy (0.1.17) unstable; urgency=medium
 
   * Missing __version__.
