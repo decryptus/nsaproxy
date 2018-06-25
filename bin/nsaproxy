@@ -74,12 +74,12 @@ def argv_parse_check():
     parser.add_option("-u",
                       dest      = 'username',
                       type      = 'string',
-                      default   = "root",
+                      default   = pwd.getpwuid(os.geteuid())[0],
                       help      = "Use username for the process instead of %default")
     parser.add_option("-g",
                       dest      = 'groupname',
                       type      = 'string',
-                      default   = "root",
+                      default   = grp.getgrgid(os.getegid())[0],
                       help      = "Use groupname for the process instead of %default")
     parser.add_option("--logfile",
                       dest      = 'logfile',
@@ -114,6 +114,9 @@ def main(options):
     uid         = pwd.getpwnam(options.username)[2]
     gid         = grp.getgrnam(options.groupname)[2]
 
+    setattr(options, 'server_version', "%s/%s" % (SYSLOG_NAME, __version__))
+    setattr(options, 'sys_version', '')
+
     http_json_server.init(options, False)
     config.DWHO_THREADS.append(http_json_server.stop)
 
@@ -122,8 +125,9 @@ def main(options):
         daemonize.daemonize()
 
     dirpid = os.path.dirname(options.pidfile)
-    helpers.make_dirs(dirpid)
-    os.chown(dirpid, uid, gid)
+    if dirpid:
+        helpers.make_dirs(dirpid)
+        os.chown(dirpid, uid, gid)
 
     LOG.info("locking PID")
     daemonize.lock_pidfile_or_die(options.pidfile)

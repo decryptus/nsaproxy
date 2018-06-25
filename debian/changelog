@@ -1,3 +1,9 @@
+nsaproxy (0.1.16) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Mon, 25 Jun 2018 10:28:26 +0200
+
 nsaproxy (0.1.15) unstable; urgency=medium
 
   * Reviewed exclude behaviour.
