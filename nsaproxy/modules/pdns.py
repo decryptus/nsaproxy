@@ -156,39 +156,11 @@ class PDNSModule(DWhoModuleBase):
         return r
 
 
-    API_CACHE_FLUSH_QSCHEMA = xys.load("""
-    domain: !!str
-    """)
-
-    def api_cache_flush(self, request):
-        params = request.query_params()
-        args   = request.payload_params()
-
-        self._check_api_key(request)
-
-        if not isinstance(params, dict):
-            raise HttpReqErrJson(400, "invalid arguments type")
-
-        if not xys.validate(params, self.API_CACHE_FLUSH_QSCHEMA):
-            raise HttpReqErrJson(415, "invalid arguments for command")
-
-        if not self.LOCK.acquire_read(self.lock_timeout):
-            raise HttpReqErrJson(503, "unable to take LOCK for reading after %s seconds" % self.lock_timeout)
-
-        try:
-            return self._do_response(request, params, args)
-        except HttpReqErrJson, e:
-            raise
-        except Exception, e:
-            LOG.exception("%r", e)
-        finally:
-            self.LOCK.release()
-
-
     ENDPOINT_GET_QSCHEMA = xys.load("""
     server_id: !!str
     endpoint:  !!str
     id*:       !!str
+    command*:  !~~enum(check,export)
     """)
 
     def api_endpoint_get(self, request):
@@ -206,7 +178,7 @@ class PDNSModule(DWhoModuleBase):
             raise HttpReqErrJson(503, "unable to take LOCK for reading after %s seconds" % self.lock_timeout)
 
         try:
-            return self._do_response(request)
+            return self._do_response(request, params)
         except HttpReqErrJson, e:
             raise
         except Exception, e:
@@ -219,7 +191,8 @@ class PDNSModule(DWhoModuleBase):
     server_id:    !!str
     endpoint:     !!str
     id:           !!str
-    command:      !~~enum(axfr-retrieve,notify)
+    command*:     !~~enum(axfr-retrieve,notify,rectify)
+    domain*:      !!str
     """)
 
     def api_endpoint_put(self, request):

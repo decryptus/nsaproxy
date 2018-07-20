@@ -11,6 +11,7 @@ Homepage: https://www.commandersact.com
 Package: nsaproxy
 Architecture: all
 Homepage: https://www.commandersact.com
-Depends: ${misc:Depends}, ${python:Depends}, python-dev (>= 2.7), python-pip
+Depends: ${misc:Depends}, python-pycurl, python (>= 2.7~), python (<< 2.8)
+Pre-Depends: python-dev (>= 2.7), python-pip, python-setuptools
 Suggests: redis-server (>= 2.4)
 Description: Fjord Technologies nsaproxy package

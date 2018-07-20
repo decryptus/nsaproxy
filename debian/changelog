@@ -1,3 +1,21 @@
+nsaproxy (0.1.21) unstable; urgency=medium
+
+  * Removed useless api_cache_flush in pdns module.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Fri, 20 Jul 2018 11:02:52 +0200
+
+nsaproxy (0.1.20) unstable; urgency=medium
+
+  * Added commands export and check.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Fri, 20 Jul 2018 10:18:48 +0200
+
+nsaproxy (0.1.19) unstable; urgency=medium
+
+  * Fixed debian dependencies.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Fri, 29 Jun 2018 11:23:59 +0200
+
 nsaproxy (0.1.18) unstable; urgency=medium
 
   * Fixed README.md

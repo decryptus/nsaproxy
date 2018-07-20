@@ -30,18 +30,14 @@ plugins:
 modules:
   pdns:
     routes:
-      api_cache_flush:
-        handler:   'api_cache_flush'
-        name:      'api/v1/servers/localhost/cache/flush'
-        op:        'PUT'
       api_endpoint_get:
         handler:   'api_endpoint_get'
-        regexp:    '^api/v1/servers/(?P<server_id>[^\/]+)/(?P<endpoint>[^\/]+)(?:/(?P<id>[a-zA-Z0-9\.\-]+))?$'
+        regexp:    '^api/v1/servers/(?P<server_id>[^\/]+)/(?P<endpoint>[^\/]+)(?:/(?P<id>[a-zA-Z0-9\.\-]+)(?:/(?P<command>check|export))?)?$'
         op:        'GET'
         safe_init: true
       api_endpoint_put:
         handler:   'api_endpoint_put'
-        regexp:    '^api/v1/servers/(?P<server_id>[^\/]+)/(?P<endpoint>[^\/]+)/(?P<id>[a-zA-Z0-9\.\-]+)/(?P<command>axfr-retrieve|notify)$'
+        regexp:    '^api/v1/servers/(?P<server_id>[^\/]+)/(?P<endpoint>[^\/]+)/(?P<id>[a-zA-Z0-9\.\-]+)(?:/(?P<command>axfr-retrieve|notify|rectify))?$'
         op:        'PUT'
       api_endpoint_post:
         handler:   'api_endpoint_post'
