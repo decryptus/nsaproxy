@@ -1,3 +1,9 @@
+nsaproxy (0.1.24) unstable; urgency=medium
+
+  * Reviewed requirements.txt.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Sun, 23 Sep 2018 13:48:41 +0200
+
 nsaproxy (0.1.23) unstable; urgency=medium
 
   * Reviewed requirements.txt.
@@ -93,7 +99,7 @@ nsaproxy (0.1.9) unstable; urgency=medium
 nsaproxy (0.1.8) unstable; urgency=medium
 
   * Release version: 0.1.8
-  * Added file: etc/nsaproxy/nsaproxy.yml.example 
+  * Added file: etc/nsaproxy/nsaproxy.yml.example
 
  -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Mon, 23 Apr 2018 12:00:55 +0200
 
