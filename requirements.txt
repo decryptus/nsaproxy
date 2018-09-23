@@ -1,8 +1,8 @@
 boto3>=1.4.2
 cdnetworks>=0.1.8
-dwho>=0.2.27
+dwho>=0.2.58
 pycurl
 pyyaml>=3.10
 redis>=2.4.0
 requests
-sonicprobe>=0.2.40
+sonicprobe>=0.2.51

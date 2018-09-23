@@ -5,7 +5,7 @@ import os
 from setuptools import find_packages, setup
 
 requirements = [line.strip() for line in open('requirements.txt', 'r').readlines()]
-version      = '0.1.21'
+version      = '0.1.23'
 
 if os.path.isfile('VERSION'):
     version = open('VERSION', 'r').readline().strip() or version

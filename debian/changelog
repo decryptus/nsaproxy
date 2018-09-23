@@ -1,3 +1,15 @@
+nsaproxy (0.1.23) unstable; urgency=medium
+
+  * Reviewed requirements.txt.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Sun, 23 Sep 2018 11:49:25 +0200
+
+nsaproxy (0.1.22) unstable; urgency=medium
+
+  * Reviewed requirements.txt.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Sun, 23 Sep 2018 11:36:32 +0200
+
 nsaproxy (0.1.21) unstable; urgency=medium
 
   * Removed useless api_cache_flush in pdns module.
