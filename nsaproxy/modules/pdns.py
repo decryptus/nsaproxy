@@ -30,7 +30,7 @@ from nsaproxy.classes.apis import NSAProxyApiObject, APIS_SYNC
 from sonicprobe import helpers
 from sonicprobe.libs import network, urisup, xys
 from sonicprobe.libs.moresynchro import RWLock
-from sonicprobe.libs.http_json_server import HttpReqErrJson, HttpResponseJson
+from httpdis.ext.httpdis_json import HttpReqErrJson, HttpResponseJson
 
 LOG = logging.getLogger('nsaproxy.modules.pdns')
 

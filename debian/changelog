@@ -1,3 +1,10 @@
+nsaproxy (0.1.25) unstable; urgency=medium
+
+  * Added environment variables NSAPROXY_USER NSAPROXY_GROUP NSAPROXY_LOGFILE
+    NSAPROXY_PIDFILE.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Fri, 05 Oct 2018 09:40:43 +0200
+
 nsaproxy (0.1.24) unstable; urgency=medium
 
   * Reviewed requirements.txt.

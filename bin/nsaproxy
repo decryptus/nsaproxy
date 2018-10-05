@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 nsaproxy
@@ -20,7 +20,7 @@ __license__ = """
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-__version__ = '0.1.24'
+__version__ = '0.1.25'
 
 # TODO: load Python logging configuration (using standard logging.config)
 
@@ -34,12 +34,29 @@ from nsaproxy.modules import * # XXX
 from nsaproxy.plugins import * # XXX
 from dwho.modules import * # XXX
 from dwho import config
+from httpdis.ext import httpdis_json
 from sonicprobe import helpers
-from sonicprobe.libs import daemonize, http_json_server
+from sonicprobe.libs import daemonize
 
 
-SYSLOG_NAME = "nsaproxy"
-LOG         = logging.getLogger(SYSLOG_NAME)
+SYSLOG_NAME     = "nsaproxy"
+LOG             = logging.getLogger(SYSLOG_NAME)
+
+DEFAULT_PIDFILE = "/run/nsaproxy/nsaproxy.pid"
+DEFAULT_LOGFILE = "/var/log/nsaproxy/daemon.log"
+
+try:
+    NSAPROXY_USER  = pwd.getpwnam(os.environ.get('NSAPROXY_USER') or 'nsaproxy').pw_name
+except KeyError:
+    NSAPROXY_USER  = pwd.getpwuid(os.geteuid())[0]
+
+try:
+    NSAPROXY_GROUP = grp.getgrnam(os.environ.get('NSAPROXY_GROUP') or 'nsaproxy').gr_name
+except KeyError:
+    NSAPROXY_GROUP = grp.getgrgid(os.getegid())[0]
+
+NSAPROXY_PIDFILE = os.environ.get('NSAPROXY_PIDFILE') or DEFAULT_PIDFILE
+NSAPROXY_LOGFILE = os.environ.get('NSAPROXY_LOGFILE') or DEFAULT_LOGFILE
 
 
 def argv_parse_check():
@@ -70,22 +87,22 @@ def argv_parse_check():
                       help      = "Use configuration file <conffile> instead of %default")
     parser.add_option("-p",
                       dest      = 'pidfile',
-                      default   = "/run/nsaproxy.pid",
+                      default   = NSAPROXY_PIDFILE,
                       help      = "Use PID file <pidfile> instead of %default")
     parser.add_option("-u",
                       dest      = 'username',
                       type      = 'string',
-                      default   = pwd.getpwuid(os.geteuid())[0],
+                      default   = NSAPROXY_USER,
                       help      = "Use username for the process instead of %default")
     parser.add_option("-g",
                       dest      = 'groupname',
                       type      = 'string',
-                      default   = grp.getgrgid(os.getegid())[0],
+                      default   = NSAPROXY_GROUP,
                       help      = "Use groupname for the process instead of %default")
     parser.add_option("--logfile",
                       dest      = 'logfile',
                       type      = 'string',
-                      default   = "/var/log/nsaproxy/daemon.log",
+                      default   = NSAPROXY_LOGFILE,
                       help      = "Use log file <logfile> instead of %default")
     parser.add_option("--listen-addr",
                       dest      = 'listen_addr',
@@ -109,26 +126,24 @@ def main(options):
     """
     Main function; start the server
     """
+    uid = pwd.getpwnam(options.username)[2]
+    gid = grp.getgrnam(options.groupname)[2]
+
+    config.make_piddir(options.pidfile, uid, gid)
+    config.make_logdir(options.logfile, uid, gid)
+
     root_logger = config.init_logger(options.logfile, SYSLOG_NAME)
     options     = config.load_conf(options.conffile, options)
-
-    uid         = pwd.getpwnam(options.username)[2]
-    gid         = grp.getgrnam(options.groupname)[2]
 
     setattr(options, 'server_version', "%s/%s" % (SYSLOG_NAME, __version__))
     setattr(options, 'sys_version', '')
 
-    http_json_server.init(options, False)
-    config.DWHO_THREADS.append(http_json_server.stop)
+    httpdis_json.init(options, False)
+    config.DWHO_THREADS.append(httpdis_json.stop)
 
     if not options.foreground:
         LOG.info("Transforming into a daemon from hell")
         daemonize.daemonize()
-
-    dirpid = os.path.dirname(options.pidfile)
-    if dirpid:
-        helpers.make_dirs(dirpid)
-        os.chown(dirpid, uid, gid)
 
     LOG.info("locking PID")
     daemonize.lock_pidfile_or_die(options.pidfile)
@@ -143,7 +158,7 @@ def main(options):
 
         config.start_plugins()
         config.start_inotify()
-        http_json_server.run(options)
+        httpdis_json.run(options)
     except (KeyboardInterrupt, SystemExit):
         raise
     except Exception:

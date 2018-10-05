@@ -14,7 +14,7 @@ set -e
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 DAEMONNAME=nsaproxy
 DAEMON=/usr/bin/$DAEMONNAME
-PIDFILE=/run/$DAEMONNAME.pid
+PIDFILE=/run/nsaproxy/$DAEMONNAME.pid
 IOSCHED=idle
 NICE=0
 EXTRA_OPTS=""
