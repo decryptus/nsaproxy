@@ -1,3 +1,9 @@
+nsaproxy (0.1.26) unstable; urgency=medium
+
+  * Removed unused import.
+
+ -- Adrien DELLE CAVE (Decryptus) <adrien.delle.cave@commandersact.com>  Fri, 05 Oct 2018 12:21:51 +0200
+
 nsaproxy (0.1.25) unstable; urgency=medium
 
   * Added environment variables NSAPROXY_USER NSAPROXY_GROUP NSAPROXY_LOGFILE

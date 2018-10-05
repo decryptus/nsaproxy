@@ -20,7 +20,7 @@ __license__ = """
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-__version__ = '0.1.25'
+__version__ = '0.1.26'
 
 # TODO: load Python logging configuration (using standard logging.config)
 
@@ -35,7 +35,6 @@ from nsaproxy.plugins import * # XXX
 from dwho.modules import * # XXX
 from dwho import config
 from httpdis.ext import httpdis_json
-from sonicprobe import helpers
 from sonicprobe.libs import daemonize
 
 
