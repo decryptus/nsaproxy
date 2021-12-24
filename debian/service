@@ -1,0 +1,18 @@
+[Unit]
+Description=nsaproxy by Fjord Technologies
+Documentation=https://github.com/decryptus/nsaproxy
+After=network.target nss-lookup.target
+
+[Service]
+Type=forking
+RuntimeDirectory=nsaproxy
+PIDFile=/run/nsaproxy/nsaproxy.pid
+EnvironmentFile=-/usr/share/nsaproxy/envfile
+ExecStart=/usr/bin/nsaproxy $ARGS
+Restart=always
+User=nsaproxy
+Group=nsaproxy
+TimeoutStopSec=5s
+
+[Install]
+WantedBy=multi-user.target
