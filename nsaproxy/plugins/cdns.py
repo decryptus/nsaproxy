@@ -20,16 +20,18 @@ __license__ = """
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA..
 """
 
-import cdnetworks
 import json
 import logging
 import os
 
-from cdnetworks.services.cdns import DNS_SERVERS
 from dwho.adapters.redis import DWhoAdapterRedis
 from dwho.classes.plugins import PLUGINS
-from nsaproxy.classes.apis import NSAProxyApiBase, NSAProxyApiSync, APIS_SYNC
 from sonicprobe import helpers
+
+import cdnetworks
+from cdnetworks.services.cdns import DNS_SERVERS
+
+from nsaproxy.classes.apis import NSAProxyApiBase, NSAProxyApiSync, APIS_SYNC
 
 
 LOG = logging.getLogger('nsaproxy.plugins.cdns')
@@ -40,6 +42,7 @@ LOG = logging.getLogger('nsaproxy.plugins.cdns')
 class NSAProxyCdnsPlugin(NSAProxyApiBase):
     PLUGIN_NAME = 'cdns'
 
+    # pylint: disable-msg=attribute-defined-outside-init
     def safe_init(self):
         self.conn           = None
 
@@ -117,7 +120,8 @@ class NSAProxyCdnsPlugin(NSAProxyApiBase):
 
         return r
 
-    def _merge_rrsets(self, zone, rrsets):
+    @staticmethod
+    def _merge_rrsets(zone, rrsets):
         if not zone or not zone.get('rrsets'):
             return rrsets
 
@@ -147,7 +151,7 @@ class NSAProxyCdnsPlugin(NSAProxyApiBase):
         zoneid = args['name'].rstrip('.')
 
         if self._is_excluded_zone(zoneid):
-            return
+            return None
 
         self.adapter_redis.set_key(self._keyname_zone(zoneid), '')
 
@@ -184,7 +188,7 @@ class NSAProxyCdnsPlugin(NSAProxyApiBase):
         if not xid:
             raise LookupError("unable to find zone id: %r" % zoneid)
 
-        xid     = long(xid)
+        xid     = int(xid)
         args    = obj.get_args()
         changes = []
 
@@ -234,9 +238,10 @@ class NSAProxyCdnsPlugin(NSAProxyApiBase):
                     changes.append(record)
 
         if changes:
-            r = self.conn.change_records(xid,
-                                         changes,
-                                         deploy_type = self.config['plugins'][self.PLUGIN_NAME].get('deployment'))
+            self.conn.change_records(xid,
+                                     changes,
+                                     deploy_type = self.config['plugins'][self.PLUGIN_NAME].get('deployment'),
+                                     force       = True)
         self.adapter_redis.set_key(self._keyname_rrsets(zoneid),
                                    json.dumps(nrrsets))
 

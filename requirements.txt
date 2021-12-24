@@ -1,9 +1,10 @@
 boto3>=1.4.2
-cdnetworks>=0.1.8
-dwho>=0.2.89
-httpdis>=0.5.13
+cdnetworks>=0.2.2
+dwho>=0.3.54
+httpdis>=0.6.20
 pycurl
-pyyaml>=3.10
+PyYAML>=3.10
 redis>=2.4.0
 requests
-sonicprobe>=0.2.70
+six>=1.13.0
+sonicprobe>=0.3.43

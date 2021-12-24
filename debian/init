@@ -17,6 +17,7 @@ DAEMON=/usr/bin/$DAEMONNAME
 PIDFILE=/run/nsaproxy/$DAEMONNAME.pid
 IOSCHED=idle
 NICE=0
+RUNASUSER=nsaproxy
 EXTRA_OPTS=""
 
 [ -r /etc/default/nsaproxy ] && . /etc/default/nsaproxy
@@ -41,7 +42,7 @@ case "$1" in
     ;;
   stop)
     log_daemon_msg "Stopping nsaproxy" "$DAEMONNAME"
-    if start-stop-daemon --stop --quiet --oknodo --retry 5 --pidfile $PIDFILE;
+    if start-stop-daemon --stop --quiet --oknodo --retry 5 --pidfile $PIDFILE --user $RUNASUSER;
     then
         log_end_msg 0
     else

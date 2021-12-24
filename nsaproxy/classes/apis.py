@@ -22,8 +22,11 @@ __license__ = """
 
 import abc
 import logging
-import Queue
 import threading
+
+from six.moves import queue
+
+from sonicprobe import helpers
 
 from dwho.classes.plugins import DWhoPluginBase
 
@@ -88,12 +91,12 @@ class NSAProxyApiObject(object):
         return self.callback(self)
 
 
-class NSAProxyApiSync(dict):
+class NSAProxyApiSync(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, plugin_name):
         self.name       = plugin_name
-        self.queue      = Queue.Queue()
+        self.queue      = queue.Queue()
         self.results    = {}
 
     def qput(self, item):
@@ -112,9 +115,10 @@ class NSAProxyApiBase(threading.Thread, DWhoPluginBase):
         self.daemon = True
         self.name   = self.PLUGIN_NAME
 
-    def _is_in_cache(self, rrcache, change):
+    @staticmethod
+    def _is_in_cache(rrcache, change):
         for record in rrcache:
-            if cmp(record, change) == 0:
+            if helpers.cmp(record, change) == 0:
                 return True
 
         return False
@@ -169,7 +173,7 @@ class NSAProxyApiBase(threading.Thread, DWhoPluginBase):
                     continue
 
                 r    = getattr(self, func)(obj)
-            except Exception, e:
+            except Exception as e:
                 obj.add_error(str(e))
                 LOG.exception("%r", e)
             else:

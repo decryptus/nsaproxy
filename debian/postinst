@@ -2,23 +2,67 @@
 
 set -e
 
+USER="nsaproxy"
+GROUP="nsaproxy"
+
+DIRS="/etc/nsaproxy
+      /usr/share/nsaproxy
+      /var/log/nsaproxy
+      /var/run/nsaproxy"
+
 case "$1" in
-    configure)
-        pip install -r /usr/share/nsaproxy/requirements.txt > /dev/null
-
-        update-rc.d nsaproxy defaults
-
-        if [ -f "/etc/nsaproxy/credentials.yml" ];
+    configure|reconfigure)
+        # create nsaproxy group
+        if ! getent group "${GROUP}" >/dev/null;
         then
-            invoke-rc.d nsaproxy start || true
+            addgroup --system "${GROUP}"
         fi
+
+        # create nsaproxy user
+        if ! getent passwd "${USER}" >/dev/null;
+        then
+            adduser --system \
+            --ingroup "${GROUP}" \
+            --home /var/lib/nsaproxy \
+            --no-create-home \
+            --gecos "NSAProxy" \
+            --disabled-login "${USER}"
+        fi
+
+        echo "${DIRS}" | while read -r dir;
+        do
+            chown -R "${USER}.${GROUP}" "${dir}" || true
+        done
+
+        pip install -q -r /usr/share/nsaproxy/requirements.txt
+
+        CONFIGURED=0
+
+        if [ -f "/etc/nsaproxy/nsaproxy.yml" ];
+        then
+            CONFIGURED=1
+        fi
+
+        if [ "$(realpath "$(which init)"|grep '\/systemd$')" != "" ];
+        then
+            systemctl enable nsaproxy.service
+
+            [ ${CONFIGURED} -eq 1 ] && systemctl restart nsaproxy.service
+        else
+            update-rc.d nsaproxy defaults
+            update-rc.d nsaproxy enable
+
+            [ ${CONFIGURED} -eq 1 ] && invoke-rc.d nsaproxy restart
+        fi
+
+        exit 0
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
     ;;
 
     *)
-	echo "postinst called with unknown argument \`$1'" >&2
-	exit 1
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
     ;;
 esac

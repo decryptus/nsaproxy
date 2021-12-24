@@ -3,3 +3,11 @@
 # Service can be enabled by setting
 # NSAPROXY_ENABLE="yes"
 NSAPROXY_ENABLE="yes"
+# ARGS=""
+
+if [ -f /usr/share/nsaproxy/envfile ];
+then
+    set -a
+    . /usr/share/nsaproxy/envfile
+    set +a
+fi

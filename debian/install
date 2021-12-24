@@ -1,4 +1,5 @@
 bin/  usr/
+envfile usr/share/nsaproxy
 etc/* etc/
 requirements.txt usr/share/nsaproxy
 setup.py usr/share/nsaproxy

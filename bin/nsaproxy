@@ -20,22 +20,25 @@ __license__ = """
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-__version__ = '0.1.30'
+__version__ = '0.1.38'
 
 # TODO: load Python logging configuration (using standard logging.config)
 
-from optparse import OptionParser
+import argparse
 import logging
 import grp
 import os
 import pwd
 
-from nsaproxy.modules import * # XXX
-from nsaproxy.plugins import * # XXX
+from six import ensure_text
+
 from dwho.modules import * # XXX
 from dwho import config
 from httpdis.ext import httpdis_json
 from sonicprobe.libs import daemonize
+
+from nsaproxy.modules import * # XXX
+from nsaproxy.plugins import * # XXX
 
 
 SYSLOG_NAME     = "nsaproxy"
@@ -62,69 +65,71 @@ def argv_parse_check():
     """
     Parse (and check a little) command line parameters
     """
-    parser              = OptionParser(usage="usage: %prog [options]")
+    parser        = argparse.ArgumentParser()
 
-    parser.add_option("-l",
-                      dest      = 'loglevel',
-                      default   = 'info',   # warning: see affectation under
-                      choices   = ('critical', 'error', 'warning', 'info', 'debug'),
-                      help      = ("Emit traces with LOGLEVEL details, must be one of:\t"
-                                   "critical, error, warning, info, debug"))
-    parser.add_option("-d",
-                      action    = 'store_true',
-                      dest      = 'dontlauchmain',
-                      default   = False,
-                      help      = "Don't call the main function, for installation test purposes")
-    parser.add_option("-f",
-                      action    = 'store_true',
-                      dest      = 'foreground',
-                      default   = False,
-                      help      = "Foreground, don't daemonize")
-    parser.add_option("-c",
-                      dest      = 'conffile',
-                      default   = '/etc/nsaproxy/nsaproxy.yml',
-                      help      = "Use configuration file <conffile> instead of %default")
-    parser.add_option("-p",
-                      dest      = 'pidfile',
-                      default   = NSAPROXY_PIDFILE,
-                      help      = "Use PID file <pidfile> instead of %default")
-    parser.add_option("-u",
-                      dest      = 'username',
-                      type      = 'string',
-                      default   = NSAPROXY_USER,
-                      help      = "Use username for the process instead of %default")
-    parser.add_option("-g",
-                      dest      = 'groupname',
-                      type      = 'string',
-                      default   = NSAPROXY_GROUP,
-                      help      = "Use groupname for the process instead of %default")
-    parser.add_option("--logfile",
-                      dest      = 'logfile',
-                      type      = 'string',
-                      default   = NSAPROXY_LOGFILE,
-                      help      = "Use log file <logfile> instead of %default")
-    parser.add_option("--listen-addr",
-                      dest      = 'listen_addr',
-                      help      = "Listen on address <listen_addr>")
-    parser.add_option("--listen-port",
-                      dest      = 'listen_port',
-                      type      = 'int',
-                      help      = "Listen on port <listen_port>")
+    parser.add_argument("-l",
+                        dest      = 'loglevel',
+                        default   = 'info',   # warning: see affectation under
+                        choices   = ('critical', 'error', 'warning', 'info', 'debug'),
+                        help      = ("Emit traces with LOGLEVEL details, must be one of:\t"
+                                     "critical, error, warning, info, debug"))
+    parser.add_argument("-d",
+                        action    = 'store_true',
+                        dest      = 'dontlauchmain',
+                        default   = False,
+                        help      = "Don't call the main function, for installation test purposes")
+    parser.add_argument("-f",
+                        action    = 'store_true',
+                        dest      = 'foreground',
+                        default   = False,
+                        help      = "Foreground, don't daemonize")
+    parser.add_argument("-c",
+                        dest      = 'conffile',
+                        type      = ensure_text,
+                        default   = '/etc/nsaproxy/nsaproxy.yml',
+                        help      = "Use configuration file <conffile> instead of %(default)s")
+    parser.add_argument("-p",
+                        dest      = 'pidfile',
+                        type      = ensure_text,
+                        default   = NSAPROXY_PIDFILE,
+                        help      = "Use PID file <pidfile> instead of %(default)s")
+    parser.add_argument("-u",
+                        dest      = 'username',
+                        type      = ensure_text,
+                        default   = NSAPROXY_USER,
+                        help      = "Use username for the process instead of %(default)s")
+    parser.add_argument("-g",
+                        dest      = 'groupname',
+                        type      = ensure_text,
+                        default   = NSAPROXY_GROUP,
+                        help      = "Use groupname for the process instead of %(default)s")
+    parser.add_argument("--logfile",
+                        dest      = 'logfile',
+                        type      = ensure_text,
+                        default   = NSAPROXY_LOGFILE,
+                        help      = "Use log file <logfile> instead of %(default)s")
+    parser.add_argument("--listen-addr",
+                        dest      = 'listen_addr',
+                        type      = ensure_text,
+                        help      = "Listen on address <listen_addr>")
+    parser.add_argument("--listen-port",
+                        dest      = 'listen_port',
+                        type      = int,
+                        help      = "Listen on port <listen_port>")
 
-    options, args       = parser.parse_args()
+    args          = parser.parse_args()
+    args.loglevel = getattr(logging, args.loglevel.upper(), logging.INFO)
 
-    if args:
-        parser.error("no argument is allowed - use option --help to get an help screen")
-
-    options.loglevel    = getattr(logging, options.loglevel.upper(), logging.INFO)
-
-    return options
+    return args
 
 
 def main(options):
     """
     Main function; start the server
     """
+    config.set_softname(SYSLOG_NAME)
+    config.set_softver(__version__)
+
     uid = pwd.getpwnam(options.username)[2]
     gid = grp.getgrnam(options.groupname)[2]
 
@@ -153,10 +158,9 @@ def main(options):
         os.chown(options.pidfile, uid, gid)
         os.setgid(gid)
         os.setuid(uid)
-        os.umask(022)
+        os.umask(0o22)
 
         config.start_plugins()
-        config.start_inotify()
         httpdis_json.run(options)
     except (KeyboardInterrupt, SystemExit):
         raise

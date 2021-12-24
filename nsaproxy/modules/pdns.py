@@ -21,16 +21,19 @@ __license__ = """
 
 import json
 import logging
-import requests
 import time
 import uuid
+import requests
+
+from six import itervalues
 
 from dwho.classes.modules import DWhoModuleBase, MODULES
-from nsaproxy.classes.apis import NSAProxyApiObject, APIS_SYNC
 from sonicprobe import helpers
 from sonicprobe.libs import network, urisup, xys
 from sonicprobe.libs.moresynchro import RWLock
 from httpdis.ext.httpdis_json import HttpReqErrJson, HttpResponseJson
+
+from nsaproxy.classes.apis import NSAProxyApiObject, APIS_SYNC
 
 LOG = logging.getLogger('nsaproxy.modules.pdns')
 
@@ -38,7 +41,8 @@ LOG = logging.getLogger('nsaproxy.modules.pdns')
 def validate_params(params):
     if not isinstance(params, (list, dict)):
         return False
-    elif len(params) == 0:
+
+    if not params:
         return True
 
     return params
@@ -56,6 +60,7 @@ class PDNSModule(DWhoModuleBase):
 
     LOCK            = RWLock()
 
+    # pylint: disable-msg=attribute-defined-outside-init
     def safe_init(self, options):
         self.results      = {}
         self.lock_timeout = self.config['general']['lock_timeout']
@@ -74,7 +79,7 @@ class PDNSModule(DWhoModuleBase):
     def _fetch_zone(self, request, params, path = None):
         res = self._do_request('get', path or request.get_path(), params, None, request.get_headers())
         if not res.text:
-            return
+            return None
 
         return res.json()
 
@@ -148,7 +153,7 @@ class PDNSModule(DWhoModuleBase):
     def _push_apis_sync(self, endpoint, params, args = None, zone = None):
         r   = []
         xid = "%s" % uuid.uuid4()
-        for api_sync in APIS_SYNC.itervalues():
+        for api_sync in itervalues(APIS_SYNC):
             uid = "%s:%s" % (api_sync.name, xid)
             api_sync.qput(NSAProxyApiObject(api_sync.name, uid, endpoint, zone, params, args, self._set_result))
             r.append(uid)
@@ -179,9 +184,9 @@ class PDNSModule(DWhoModuleBase):
 
         try:
             return self._do_response(request, params)
-        except HttpReqErrJson, e:
+        except HttpReqErrJson as e:
             raise
-        except Exception, e:
+        except Exception as e:
             LOG.exception("%r", e)
         finally:
             self.LOCK.release()
@@ -211,9 +216,9 @@ class PDNSModule(DWhoModuleBase):
 
         try:
             return self._do_response(request, params)
-        except HttpReqErrJson, e:
+        except HttpReqErrJson as e:
             raise
-        except Exception, e:
+        except Exception as e:
             LOG.exception("%r", e)
         finally:
             self.LOCK.release()
@@ -229,6 +234,7 @@ class PDNSModule(DWhoModuleBase):
     masters?:      [ !!str ]
     kind?:         !~~enum(native,master,slave)
     name?:         !!str
+    account?:      !!str
     soa_edit_api?: !~~enum(INCEPTION-INCREMENT,EPOCH,INCEPTION-EPOCH)
     """)
 
@@ -254,8 +260,7 @@ class PDNSModule(DWhoModuleBase):
             raise HttpReqErrJson(503, "unable to take LOCK for reading after %s seconds" % self.lock_timeout)
 
         try:
-            uids        = []
-            nameservers = []
+            uids = []
 
             if params.get('endpoint') == 'zones':
                 uids = self._push_apis_sync('create_hosted_zone', params, args)
@@ -291,9 +296,9 @@ class PDNSModule(DWhoModuleBase):
                     self._refresh_apis(data)
 
             return r
-        except HttpReqErrJson, e:
+        except HttpReqErrJson as e:
             raise
-        except Exception, e:
+        except Exception as e:
             LOG.exception("%r", e)
         finally:
             self.LOCK.release()
@@ -311,13 +316,16 @@ class PDNSModule(DWhoModuleBase):
     kind?:         !~~enum(native,master,slave)
     name?:         !!str
     soa_edit_api?: !~~enum(INCEPTION-INCREMENT,EPOCH,INCEPTION-EPOCH)
-    rrsets?:       !~~seqlen(0,999)
+    rrsets?:       !~~seqlen(0,9999)
+      - comments?:
+          - content:  !!str
+          - account:  !!str
       - records:
           - content*: !!str
             disabled: !~~isBool
             set-prt?: !~~isBool
         changetype:   !~~enum(DELETE,REPLACE)
-        type:    !~~enum(A,AAAA,CAA,CNAME,RCNAME,MX,NS,PTR,SOA,SPF,SRV,TXT)
+        type:    !~~enum(A,AAAA,ALIAS,CAA,CNAME,RCNAME,MX,NS,PTR,SOA,SPF,SRV,TXT)
         name:    !!str
         ttl?:    !~~uint
     """)
@@ -363,9 +371,9 @@ class PDNSModule(DWhoModuleBase):
                 raise HttpReqErrJson(409, "failed to synchronize on dns provider. (errors: %r)" % res['failed'])
 
             return self._do_response(request, None, args)
-        except HttpReqErrJson, e:
+        except HttpReqErrJson as e:
             raise
-        except Exception, e:
+        except Exception as e:
             LOG.exception("%r", e)
         finally:
             self.LOCK.release()
@@ -409,7 +417,7 @@ class PDNSModule(DWhoModuleBase):
             return self._do_response(request)
         except HttpReqErrJson:
             raise
-        except Exception, e:
+        except Exception as e:
             LOG.exception("%r", e)
         finally:
             self.LOCK.release()

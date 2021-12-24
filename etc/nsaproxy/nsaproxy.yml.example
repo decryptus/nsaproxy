@@ -10,9 +10,10 @@ general:
       url:            'redis://127.0.0.1:6379?db=0'
   pdns:
      api_uri:     'http://localhost:8081'
-#    credentials: file:///etc/nsaproxy/credentials.yml
+     credentials: file:///etc/nsaproxy/credentials.yml
 plugins:
   cdns:
+    enabled: true
     deployment: production # null, staging or production
     credentials: file:///etc/nsaproxy/credentials.yml
 #    soa:
@@ -26,6 +27,7 @@ plugins:
 #        'CNAME':
 #          - '*.example.org.'
   r53:
+    enabled: true
     credentials: file:///etc/nsaproxy/credentials.yml
 modules:
   pdns:
