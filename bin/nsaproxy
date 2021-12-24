@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """nsaproxy"""
 
-__version__ = '0.1.40'
+__version__ = '0.1.41'
 
 # TODO: load Python logging configuration (using standard logging.config)
 
