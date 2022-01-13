@@ -11,6 +11,19 @@ general:
   pdns:
      api_uri:     'http://localhost:8081'
      credentials: file:///etc/nsaproxy/credentials.yml
+#dns:
+#  domains:
+#    default:
+#      import_rrsets: rrsets/default.yml.example
+#    example.org:
+#      import_rrsets: rrsets/exemple.org.yml.example
+#  soa:
+#    default:
+#      content: '%(nameserver.0)s %(email_address)s 0 7200 900 604800 300'
+#      email_address: 'foo@example.com'
+#    example.org:
+#      content: 'ns3.example.org. %(email_address)s 0 7200 3600 1209600 3600'
+#      email_address: 'bar@example.org'
 plugins:
   cdns:
     enabled: true

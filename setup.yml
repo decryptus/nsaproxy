@@ -3,9 +3,9 @@ name: nsaproxy
 description: nsaproxy
 author: Adrien Delle Cave
 author_email: pypi@doowan.net
-copyright: '2021 fjord-technologies'
-release: '0.1.41'
-version: '0.1.41'
+copyright: '2022 fjord-technologies'
+release: '0.1.44'
+version: '0.1.44'
 license: License GPL-3
 url: https://github.com/decryptus/nsaproxy
 python_requires:

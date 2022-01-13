@@ -1,7 +1,7 @@
 boto3>=1.4.2
-cdnetworks>=0.2.2
-dwho>=0.3.54
-httpdis>=0.6.20
+cdnetworks>=0.2.3
+dwho>=0.3.56
+httpdis>=0.6.22
 pycurl
 PyYAML>=3.10
 redis>=2.4.0

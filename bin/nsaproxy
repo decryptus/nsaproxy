@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """nsaproxy"""
 
-__version__ = '0.1.41'
+__version__ = '0.1.44'
 
 # TODO: load Python logging configuration (using standard logging.config)
 
@@ -21,6 +21,7 @@ from dwho import config
 from httpdis.ext import httpdis_json
 from sonicprobe.libs import daemonize
 
+from nsaproxy.classes.config import load_conf
 from nsaproxy.modules import * # XXX
 from nsaproxy.plugins import * # XXX
 
@@ -121,7 +122,7 @@ def main(options):
     config.make_logdir(options.logfile, uid, gid)
 
     root_logger = config.init_logger(options.logfile, SYSLOG_NAME)
-    options     = config.load_conf(options.conffile, options)
+    options     = load_conf(options.conffile, options)
 
     setattr(options, 'server_version', "%s/%s" % (SYSLOG_NAME, __version__))
     setattr(options, 'sys_version', '')

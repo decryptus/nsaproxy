@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright (C) 2018-2021 fjord-technologies
+# Copyright (C) 2018-2022 fjord-technologies
 # SPDX-License-Identifier: GPL-3.0-or-later
 """nsaproxy.modules.pdns"""
 
@@ -9,6 +9,8 @@ import time
 import uuid
 import requests
 
+from copy import deepcopy
+
 from six import itervalues
 
 from dwho.classes.modules import DWhoModuleBase, MODULES
@@ -17,7 +19,8 @@ from sonicprobe.libs import network, urisup, xys
 from sonicprobe.libs.moresynchro import RWLock
 from httpdis.ext.httpdis_json import HttpReqErrJson, HttpResponseJson
 
-from nsaproxy.classes.apis import NSAProxyApiObject, APIS_SYNC
+from ..classes.apis import NSAProxyApiObject, APIS_SYNC
+from ..classes.common import DEFAULT_TTL, NSAProxyPDNSApiHelpers
 
 LOG = logging.getLogger('nsaproxy.modules.pdns')
 
@@ -44,6 +47,18 @@ class PDNSModule(DWhoModuleBase):
 
     LOCK            = RWLock()
 
+    def __init__(self):
+        DWhoModuleBase.__init__(self)
+
+        self._helpers = None
+
+    def init(self, config):
+        DWhoModuleBase.init(self, config)
+
+        self._helpers = NSAProxyPDNSApiHelpers(self.config)
+
+        return self
+
     # pylint: disable-msg=attribute-defined-outside-init
     def safe_init(self, options):
         self.results      = {}
@@ -60,6 +75,73 @@ class PDNSModule(DWhoModuleBase):
 
             self.api_key = cred['pdns']['api_key']
 
+    @staticmethod
+    def _add_record(content):
+        return {'content': content, 'disabled': False, 'set-prt': False}
+
+    def _add_rrset(self, zone, domain_name, xtype, content, ttl = DEFAULT_TTL):
+        if 'rrsets' not in zone:
+            zone['rrsets'] = []
+
+        for rrset in zone['rrsets']:
+            if rrset['type'] != xtype:
+                continue
+
+            if rrset['name'].rstrip('.') != domain_name:
+                continue
+
+            rrset['records'] = [self._add_record(content)]
+            return
+
+        zone['rrsets'].append({'name': "%s." % domain_name,
+                               'type': xtype,
+                               'ttl': ttl,
+                               'changetype': 'REPLACE',
+                               'records': [self._add_record(content)]})
+
+    def _append_rrsets(self, zone, domain_name, rrsets):
+        r = False
+
+        if not isinstance(rrsets, list):
+            return r
+
+        if 'rrsets' not in zone:
+            zone['rrsets'] = []
+
+        for x in rrsets:
+            rrset = deepcopy(x)
+            names = rrset['name']
+
+            if not isinstance(names, list):
+                names = [names]
+
+            for name in names:
+                if name == '@':
+                    rrset['name'] = "%s." % domain_name
+                elif name == '*':
+                    rrset['name'] = "*.%s." % domain_name
+                elif name[-1] == '.':
+                    rrset['name'] = "%s." % name.rstrip('.')
+                else:
+                    rrset['name'] = "%s.%s." % (name.rstrip('.'), domain_name)
+
+                rrset['ttl'] = int(rrset.get('ttl', DEFAULT_TTL))
+
+                rrset['changetype'] = 'REPLACE'
+
+                if rrset.get('records'):
+                    for record in rrset['records']:
+                        record['disabled'] = bool(record.get('disabled') or False)
+
+                if rrset.get('comments'):
+                    for comment in rrset['comments']:
+                        comment['account'] = comment.get('account') or ''
+
+                zone['rrsets'].append(deepcopy(rrset))
+                r = True
+
+        return r
+
     def _fetch_zone(self, request, params, path = None):
         res = self._do_request('get', path or request.get_path(), params, None, request.get_headers())
         if not res.text:
@@ -75,10 +157,7 @@ class PDNSModule(DWhoModuleBase):
 
     def _do_request(self, method, path, params, payload, headers):
         uri    = list(self.api_uri)
-        if path:
-            uri[2] = path
-        else:
-            uri[2] = None
+        uri[2] = path or None
 
         h      = {}
         for k, v in headers.iteritems():
@@ -219,7 +298,7 @@ class PDNSModule(DWhoModuleBase):
     kind?:         !~~enum(native,master,slave)
     name?:         !!str
     account?:      !!str
-    soa_edit_api?: !~~enum(INCEPTION-INCREMENT,EPOCH,INCEPTION-EPOCH)
+    soa_edit_api?: !~~enum(DEFAULT,INCREASE,INCEPTION-INCREMENT,EPOCH,INCEPTION-EPOCH)
     """)
 
     def api_endpoint_post(self, request):
@@ -244,13 +323,23 @@ class PDNSModule(DWhoModuleBase):
             raise HttpReqErrJson(503, "unable to take LOCK for reading after %s seconds" % self.lock_timeout)
 
         try:
-            uids = []
-
-            if params.get('endpoint') == 'zones':
-                uids = self._push_apis_sync('create_hosted_zone', params, args)
-            else:
+            if params.get('endpoint') != 'zones':
                 raise HttpReqErrJson(400, "invalid request")
 
+            has_rrsets = False
+            domain_name = args['name'].rstrip('.')
+
+            if self.config['dns'].get('domains'):
+                for domain in (domain_name, 'default'):
+                    if not self.config['dns']['domains'].get(domain):
+                        continue
+                    rrsets = deepcopy(self.config['dns']['domains'][domain]['rrsets'])
+
+                    has_rrsets = self._append_rrsets(args,
+                                                     domain_name,
+                                                     rrsets)
+
+            uids = self._push_apis_sync('create_hosted_zone', params, args)
             if not uids:
                 raise HttpReqErrJson(500, "unable to retrieve uids")
 
@@ -269,8 +358,15 @@ class PDNSModule(DWhoModuleBase):
                 for nameserver in res['nameservers']:
                     args['nameservers'].append("%s." % nameserver.rstrip('.'))
 
+            soa_content = self._helpers.build_soa_content(domain_name, args.get('nameservers'))
+            if soa_content:
+                has_rrsets = True
+                self._add_rrset(args, domain_name, 'SOA', soa_content)
+
             r = self._do_response(request, None, args)
-            if not args.get('nameservers') or not r:
+            if not r \
+               or (not args.get('nameservers') \
+                   and not has_rrsets):
                 return r
 
             data = r.get_data()
@@ -336,17 +432,14 @@ class PDNSModule(DWhoModuleBase):
             raise HttpReqErrJson(503, "unable to take LOCK for reading after %s seconds" % self.lock_timeout)
 
         try:
-            uids = []
-
-            if params.get('endpoint') == 'zones':
-                if not args.get('rrsets'):
-                    return self._do_response(request, None, args)
-
-                zone = self._fetch_zone(request, params)
-                uids = self._push_apis_sync('change_rrsets', params, args, zone)
-            else:
+            if params.get('endpoint') != 'zones':
                 raise HttpReqErrJson(400, "invalid request")
 
+            if not args.get('rrsets'):
+                return self._do_response(request, None, args)
+
+            zone = self._fetch_zone(request, params)
+            uids = self._push_apis_sync('change_rrsets', params, args, zone)
             if not uids:
                 raise HttpReqErrJson(500, "unable to retrieve uids")
 
@@ -384,13 +477,10 @@ class PDNSModule(DWhoModuleBase):
             raise HttpReqErrJson(503, "unable to take LOCK for reading after %s seconds" % self.lock_timeout)
 
         try:
-            uids = []
-
-            if params.get('endpoint') == 'zones':
-                uids = self._push_apis_sync('delete_hosted_zone', params)
-            else:
+            if params.get('endpoint') != 'zones':
                 raise HttpReqErrJson(400, "invalid request")
 
+            uids = self._push_apis_sync('delete_hosted_zone', params)
             if not uids:
                 raise HttpReqErrJson(500, "unable to retrieve uids")
 

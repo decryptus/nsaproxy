@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright (C) 2018-2021 fjord-technologies
+# Copyright (C) 2018-2022 fjord-technologies
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import re as _re

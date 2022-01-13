@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright (C) 2018-2021 fjord-technologies
+# Copyright (C) 2018-2022 fjord-technologies
 # SPDX-License-Identifier: GPL-3.0-or-later
 """nsaproxy.classes.apis"""
 
@@ -8,12 +8,11 @@ import logging
 import threading
 
 from six.moves import queue
-
 from sonicprobe import helpers
-
 from dwho.classes.plugins import DWhoPluginBase
+from .common import NSAProxyPDNSApiHelpers
 
-LOG = logging.getLogger('nsaproxy.apis')
+LOG = logging.getLogger('nsaproxy.classes.apis')
 
 
 class NSAProxyApisSync(dict):
@@ -95,8 +94,16 @@ class NSAProxyApiBase(threading.Thread, DWhoPluginBase):
     def __init__(self):
         threading.Thread.__init__(self)
         DWhoPluginBase.__init__(self)
-        self.daemon = True
-        self.name   = self.PLUGIN_NAME
+        self.daemon   = True
+        self.name     = self.PLUGIN_NAME
+        self._helpers = None
+
+    def init(self, config):
+        DWhoPluginBase.init(self, config)
+
+        self._helpers = NSAProxyPDNSApiHelpers(self.config, self.plugconf)
+
+        return self
 
     @staticmethod
     def _is_in_cache(rrcache, change):
@@ -107,20 +114,20 @@ class NSAProxyApiBase(threading.Thread, DWhoPluginBase):
         return False
 
     def _has_excluded(self, zoneid):
-        return 'exclude' in self.config['plugins'][self.PLUGIN_NAME] \
-               and zoneid in self.config['plugins'][self.PLUGIN_NAME]['exclude']
+        return 'exclude' in self.plugconf \
+               and zoneid in self.plugconf['exclude']
 
     def _is_excluded_zone(self, zoneid):
         if not self._has_excluded(zoneid):
             return False
 
-        return self.config['plugins'][self.PLUGIN_NAME]['exclude'][zoneid] == '*'
+        return self.plugconf['exclude'][zoneid] == '*'
 
     def _is_excluded_record(self, zoneid, record_type, record_name):
         if not self._has_excluded(zoneid):
             return False
 
-        ref_conf = self.config['plugins'][self.PLUGIN_NAME]['exclude'][zoneid]
+        ref_conf = self.plugconf['exclude'][zoneid]
 
         if not isinstance(ref_conf, dict):
             LOG.warning("exclude record must be a dict or '*': %r", ref_conf)

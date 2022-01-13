@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright (C) 2018-2021 fjord-technologies
+# Copyright (C) 2018-2022 fjord-technologies
 # SPDX-License-Identifier: GPL-3.0-or-later
 """nsaproxy.plugins.r53"""
 
@@ -10,13 +10,14 @@ import re
 
 import boto3
 
+from copy import deepcopy
 from six import iteritems
 
 from dwho.adapters.redis import DWhoAdapterRedis
 from dwho.classes.plugins import PLUGINS
 from sonicprobe import helpers
 
-from nsaproxy.classes.apis import NSAProxyApiBase, NSAProxyApiSync, APIS_SYNC
+from ..classes.apis import NSAProxyApiBase, NSAProxyApiSync, APIS_SYNC
 
 
 LOG = logging.getLogger('nsaproxy.plugins.r53')
@@ -72,8 +73,8 @@ class NSAProxyR53Plugin(NSAProxyApiBase):
 
         self.adapter_redis  = DWhoAdapterRedis(self.config, prefix = 'nsaproxy')
 
-        if self.config['plugins'][self.PLUGIN_NAME].get('credentials'):
-            cred = helpers.load_yaml_file(self.config['plugins'][self.PLUGIN_NAME]['credentials'])
+        if self.plugconf.get('credentials'):
+            cred = helpers.load_yaml_file(self.plugconf['credentials'])
             if not cred:
                 raise ValueError("unable to read credentials")
 
@@ -138,7 +139,10 @@ class NSAProxyR53Plugin(NSAProxyApiBase):
                 LOG.warning("unable to find zone id: %r", zoneid)
                 return
 
-        self.conn.delete_hosted_zone(Id = xid)
+        try:
+            self.conn.delete_hosted_zone(Id = xid)
+        except self.conn.exceptions.NoSuchHostedZone:
+            pass
 
         self.adapter_redis.del_key(self._keyname_zone(zoneid))
         self.adapter_redis.del_key(self._keyname_rrsets(zoneid))
@@ -157,14 +161,16 @@ class NSAProxyR53Plugin(NSAProxyApiBase):
         for tag in tags:
             for k, v in iteritems(RE_COMMENT_TAGS):
                 m = v['regex'](tag)
-                if m:
-                    if not v.get('parent'):
-                        r[k] = v['sanitize'](m.group(1))
-                        continue
+                if not m:
+                    continue
 
-                    if v['parent'] not in r:
-                        r[v['parent']] = {}
-                    r[v['parent']][k] = v['sanitize'](m.group(1))
+                if not v.get('parent'):
+                    r[k] = v['sanitize'](m.group(1))
+                    continue
+
+                if v['parent'] not in r:
+                    r[v['parent']] = {}
+                r[v['parent']][k] = v['sanitize'](m.group(1))
 
         return r
 
@@ -236,20 +242,30 @@ class NSAProxyR53Plugin(NSAProxyApiBase):
     def _del_rrset(self, xid, changes, rtype, rrset):
         change = self._get_rrset_obj(rtype, rrset)
 
+        if rrset.get('records'):
+            max_items = str(len(rrset['records']))
+        else:
+            max_items = '1'
+
         res = self.conn.list_resource_record_sets(HostedZoneId    = xid,
                                                   StartRecordName = rrset['name'],
                                                   StartRecordType = rtype,
-                                                  MaxItems        = '1')
+                                                  MaxItems        = max_items)
         if not res or not res['ResourceRecordSets']:
             return
 
         change['Action'] = 'DELETE'
 
-        for x in RRSET_CONTENT_KEYS:
-            if x in res['ResourceRecordSets'][0]:
-                change['ResourceRecordSet'][x] = res['ResourceRecordSets'][0][x]
+        for record in res['ResourceRecordSets']:
+            if record['Type'] != rtype or record['Name'] != rrset['name']:
+                continue
 
-        changes['Changes'].append(change)
+            nchange = deepcopy(change)
+            for x in RRSET_CONTENT_KEYS:
+                if x in record:
+                    nchange['ResourceRecordSet'][x] = record[x]
+
+            changes['Changes'].append(nchange)
 
     def _do_change_rrsets(self, obj):
         params  = obj.get_params()

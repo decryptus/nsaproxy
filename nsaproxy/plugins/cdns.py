@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright (C) 2018-2021 fjord-technologies
+# Copyright (C) 2018-2022 fjord-technologies
 # SPDX-License-Identifier: GPL-3.0-or-later
 """nsaproxy.plugins.cdns"""
 
@@ -14,7 +14,7 @@ from sonicprobe import helpers
 import cdnetworks
 from cdnetworks.services.cdns import DNS_SERVERS
 
-from nsaproxy.classes.apis import NSAProxyApiBase, NSAProxyApiSync, APIS_SYNC
+from ..classes.apis import NSAProxyApiBase, NSAProxyApiSync, APIS_SYNC
 
 
 LOG = logging.getLogger('nsaproxy.plugins.cdns')
@@ -34,8 +34,8 @@ class NSAProxyCdnsPlugin(NSAProxyApiBase):
 
         self.adapter_redis  = DWhoAdapterRedis(self.config, prefix = 'nsaproxy')
 
-        if self.config['plugins'][self.PLUGIN_NAME].get('credentials'):
-            cred = helpers.load_yaml_file(self.config['plugins'][self.PLUGIN_NAME]['credentials'])
+        if self.plugconf.get('credentials'):
+            cred = helpers.load_yaml_file(self.plugconf['credentials'])
             if not cred:
                 raise ValueError("unable to read credentials")
 
@@ -50,39 +50,27 @@ class NSAProxyCdnsPlugin(NSAProxyApiBase):
         if self.PLUGIN_NAME in APIS_SYNC:
             self.start()
 
-    def _get_soa_email(self, email, zoneid):
-        ref_conf = self.config['plugins'][self.PLUGIN_NAME]
+    def _sanitize_email(self, zoneid, email):
+        email = self._helpers.get_soa_email(zoneid, email)
+        if not email:
+            return None
 
-        r = email
+        email = email.rstrip('.')
 
-        if '@' not in r:
-            r = r.replace('.', '@', 1)
+        if '@' not in email:
+            email = email.replace('.', '@', 1)
 
-        if 'soa' not in ref_conf:
-            return r
-
-        if zoneid in ref_conf['soa'] \
-           and ref_conf['soa'][zoneid].get('email_address'):
-            return ref_conf['soa'][zoneid]['email_address']
-
-        if 'default' in ref_conf['soa'] \
-           and ref_conf['soa']['default'].get('email_address'):
-            return ref_conf['soa']['default']['email_address']
-
-        return r
+        return email
 
     def _build_record_value(self, zoneid, xtype, content):
         r = {}
 
         if xtype == 'SOA':
-            (r['value'],
-             r['email'],
-             r['serial_number'],
-             r['refresh'],
-             r['retry'],
-             r['expire'],
-             r['minmum']) = content.split(' ', 7)
-            r['email'] = self._get_soa_email(r['email'].rstrip('.'), zoneid)
+            r = self._helpers.split_type_content(xtype, content)
+            if not r:
+                raise ValueError("invalid soa content: %r" % content)
+
+            r['email'] = self._sanitize_email(zoneid, r['email'])
         elif xtype == 'MX':
             (r['data'], r['value']) = content.split(' ', 1)
         elif xtype == 'SRV':
