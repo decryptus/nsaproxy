@@ -3,11 +3,11 @@ Upstream-Name: nsaproxy
 Upstream-Contact: Adrien Delle Cave
 
 Files: *
-Copyright: 2018-2021 fjord-technologies
+Copyright: 2018-2022 fjord-technologies
 License: GPL-3
 
 Files: debian/*
-Copyright: 2018-2021 Adrien Delle Cave
+Copyright: 2018-2022 Adrien Delle Cave
 License: GPL-3
 
 License: GPL-3

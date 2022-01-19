@@ -11,6 +11,8 @@ general:
   pdns:
      api_uri:     'http://localhost:8081'
      credentials: file:///etc/nsaproxy/credentials.yml
+import_modules:
+  - modules/api.yml
 #dns:
 #  domains:
 #    default:
@@ -42,27 +44,3 @@ plugins:
   r53:
     enabled: true
     credentials: file:///etc/nsaproxy/credentials.yml
-modules:
-  pdns:
-    routes:
-      api_endpoint_get:
-        handler:   'api_endpoint_get'
-        regexp:    '^api/v1/servers/(?P<server_id>[^\/]+)/(?P<endpoint>[^\/]+)(?:/(?P<id>[a-zA-Z0-9\.\-]+)(?:/(?P<command>check|export))?)?$'
-        op:        'GET'
-        safe_init: true
-      api_endpoint_put:
-        handler:   'api_endpoint_put'
-        regexp:    '^api/v1/servers/(?P<server_id>[^\/]+)/(?P<endpoint>[^\/]+)/(?P<id>[a-zA-Z0-9\.\-]+)(?:/(?P<command>axfr-retrieve|notify|rectify))?$'
-        op:        'PUT'
-      api_endpoint_post:
-        handler:   'api_endpoint_post'
-        regexp:    '^api/v1/servers/(?P<server_id>[^\/]+)/(?P<endpoint>[^\/]+)$'
-        op:        'POST'
-      api_endpoint_patch:
-        handler:   'api_endpoint_patch'
-        regexp:    '^api/v1/servers/(?P<server_id>[^\/]+)/(?P<endpoint>[^\/]+)/(?P<id>[a-zA-Z0-9\.\-]+)$'
-        op:        'PATCH'
-      api_endpoint_delete:
-        handler:   'api_endpoint_delete'
-        regexp:    '^api/v1/servers/(?P<server_id>[^\/]+)/(?P<endpoint>[^\/]+)/(?P<id>[a-zA-Z0-9\.\-]+)$'
-        op:        'DELETE'

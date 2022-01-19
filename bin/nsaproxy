@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright (C) 2018-2021 fjord-technologies
+# Copyright (C) 2018-2022 fjord-technologies
 # SPDX-License-Identifier: GPL-3.0-or-later
 """nsaproxy"""
 
-__version__ = '0.1.44'
+__version__ = '0.1.50'
 
 # TODO: load Python logging configuration (using standard logging.config)
 

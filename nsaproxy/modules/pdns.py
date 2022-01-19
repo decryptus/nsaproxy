@@ -7,11 +7,12 @@ import json
 import logging
 import time
 import uuid
-import requests
 
 from copy import deepcopy
 
-from six import itervalues
+import requests
+
+from six import itervalues, string_types
 
 from dwho.classes.modules import DWhoModuleBase, MODULES
 from sonicprobe import helpers
@@ -25,21 +26,20 @@ from ..classes.common import DEFAULT_TTL, NSAProxyPDNSApiHelpers
 LOG = logging.getLogger('nsaproxy.modules.pdns')
 
 
-def validate_params(params):
-    if not isinstance(params, (list, dict)):
+def validate_domain(domain, mask = network.MASK_DOMAIN):
+    if not isinstance(domain, string_types) \
+       or not domain \
+       or domain[-1] != '.':
         return False
 
-    if not params:
-        return True
+    return network.valid_host(domain[0:-1], mask)
 
-    return params
-
-def validate_name(ip_addr):
+def validate_ipaddr(ip_addr):
     return network.valid_host(ip_addr, network.MASK_IPV4_DOTDEC | network.MASK_IPV6)
 
 
-xys.add_callback('pdns.validate_params', validate_params)
-xys.add_callback('pdns.validate_nameservers', network.valid_host)
+xys.add_callback('pdns.domain', validate_domain)
+xys.add_callback('pdns.ipaddr', validate_ipaddr)
 
 
 class PDNSModule(DWhoModuleBase):
@@ -99,6 +99,13 @@ class PDNSModule(DWhoModuleBase):
                                'changetype': 'REPLACE',
                                'records': [self._add_record(content)]})
 
+    @staticmethod
+    def _replace_vars(key, xvars):
+        if '%(' in key and ')s' in key:
+            return key % xvars
+
+        return key
+
     def _append_rrsets(self, zone, domain_name, rrsets):
         r = False
 
@@ -125,17 +132,25 @@ class PDNSModule(DWhoModuleBase):
                 else:
                     rrset['name'] = "%s.%s." % (name.rstrip('.'), domain_name)
 
-                rrset['ttl'] = int(rrset.get('ttl', DEFAULT_TTL))
+                xvars = {'name': name,
+                         'domain_name': domain_name}
 
+                rrset['name'] = self._replace_vars(rrset['name'], xvars)
+                rrset['ttl'] = int(rrset.get('ttl', DEFAULT_TTL))
                 rrset['changetype'] = 'REPLACE'
 
                 if rrset.get('records'):
                     for record in rrset['records']:
+                        record['content'] = self._replace_vars(record.get('content') or '',
+                                                               xvars)
                         record['disabled'] = bool(record.get('disabled') or False)
 
                 if rrset.get('comments'):
                     for comment in rrset['comments']:
-                        comment['account'] = comment.get('account') or ''
+                        comment['content'] = self._replace_vars(comment.get('content') or '',
+                                                                xvars)
+                        comment['account'] = self._replace_vars(comment.get('account') or '',
+                                                                xvars)
 
                 zone['rrsets'].append(deepcopy(rrset))
                 r = True
@@ -169,8 +184,8 @@ class PDNSModule(DWhoModuleBase):
                                                  json    = payload,
                                                  headers = h)
 
-    def _do_response(self, request, params = None, args = None):
-        r =  self._do_request(request.get_method(), request.get_path(), params, args, request.get_headers())
+    def _do_response(self, request, params = None, args = None, method = None):
+        r =  self._do_request(method or request.get_method(), request.get_path(), params, args, request.get_headers())
         if not r.text:
             return HttpResponseJson(r.status_code)
 
@@ -293,10 +308,10 @@ class PDNSModule(DWhoModuleBase):
     """)
 
     ENDPOINT_POST_PSCHEMA = xys.load("""
-    nameservers?:  [ !!str ]
-    masters?:      [ !!str ]
-    kind?:         !~~enum(native,master,slave)
-    name?:         !!str
+    nameservers?:  [ !~~callback(pdns.domain) ]
+    masters?:      [ !~~callback(pdns.ipaddr) ]
+    kind?:         !~~ienum(native,master,primary,slave,secondary)
+    name?:         !~~callback(pdns.domain)
     account?:      !!str
     soa_edit_api?: !~~enum(DEFAULT,INCREASE,INCEPTION-INCREMENT,EPOCH,INCEPTION-EPOCH)
     """)
@@ -320,7 +335,7 @@ class PDNSModule(DWhoModuleBase):
             raise HttpReqErrJson(415, "invalid arguments for command payload parameters")
 
         if not self.LOCK.acquire_write(self.lock_timeout):
-            raise HttpReqErrJson(503, "unable to take LOCK for reading after %s seconds" % self.lock_timeout)
+            raise HttpReqErrJson(503, "unable to take LOCK for writing after %s seconds" % self.lock_timeout)
 
         try:
             if params.get('endpoint') != 'zones':
@@ -391,10 +406,10 @@ class PDNSModule(DWhoModuleBase):
     """)
 
     ENDPOINT_PATCH_PSCHEMA = xys.load("""
-    nameservers?:  [ !!str ]
-    masters?:      [ !!str ]
-    kind?:         !~~enum(native,master,slave)
-    name?:         !!str
+    nameservers?:  [ !~~callback(pdns.domain) ]
+    masters?:      [ !~~callback(pdns.ipaddr) ]
+    kind?:         !~~ienum(native,primary,secondary,master,slave)
+    name?:         !~~callback(pdns.domain)
     soa_edit_api?: !~~enum(INCEPTION-INCREMENT,EPOCH,INCEPTION-EPOCH)
     rrsets?:       !~~seqlen(0,9999)
       - comments?:
@@ -429,7 +444,7 @@ class PDNSModule(DWhoModuleBase):
             raise HttpReqErrJson(415, "invalid arguments for command payload parameters")
 
         if not self.LOCK.acquire_write(self.lock_timeout):
-            raise HttpReqErrJson(503, "unable to take LOCK for reading after %s seconds" % self.lock_timeout)
+            raise HttpReqErrJson(503, "unable to take LOCK for writing after %s seconds" % self.lock_timeout)
 
         try:
             if params.get('endpoint') != 'zones':
@@ -474,7 +489,7 @@ class PDNSModule(DWhoModuleBase):
             raise HttpReqErrJson(415, "invalid arguments for command for query parameters")
 
         if not self.LOCK.acquire_write(self.lock_timeout):
-            raise HttpReqErrJson(503, "unable to take LOCK for reading after %s seconds" % self.lock_timeout)
+            raise HttpReqErrJson(503, "unable to take LOCK for writing after %s seconds" % self.lock_timeout)
 
         try:
             if params.get('endpoint') != 'zones':
@@ -490,6 +505,56 @@ class PDNSModule(DWhoModuleBase):
 
             return self._do_response(request)
         except HttpReqErrJson:
+            raise
+        except Exception as e:
+            LOG.exception("%r", e)
+        finally:
+            self.LOCK.release()
+
+
+    ENDPOINT_VALIDATE_QSCHEMA = xys.load("""
+    server_id: !!str
+    endpoint:  !!str
+    id:        !~~callback(pdns.domain)
+    """)
+    def api_endpoint_validate(self, request):
+        params = request.query_params()
+
+        self._check_api_key(request)
+
+        if not isinstance(params, dict):
+            raise HttpReqErrJson(400, "invalid arguments type for query parameters")
+
+        if not xys.validate(params, self.ENDPOINT_VALIDATE_QSCHEMA):
+            raise HttpReqErrJson(415, "invalid arguments for command for query parameters")
+
+        if not self.LOCK.acquire_read(self.lock_timeout):
+            raise HttpReqErrJson(503, "unable to take LOCK for reading after %s seconds" % self.lock_timeout)
+
+        try:
+            domain = params.pop('id').lower()
+
+            r = self._do_response(request, method = 'GET')
+            if not r:
+                raise HttpReqErrJson(500, "unable to fetch domains list")
+
+            data = r.get_data()
+            if not data:
+                raise HttpReqErrJson(500, "unable to fetch domains list")
+
+            data = json.loads(data)
+            if not isinstance(data, list):
+                raise HttpReqErrJson(500, "unable to fetch domains list")
+
+            if not data:
+                return True
+
+            for x in data:
+                if x['name'] == domain:
+                    raise HttpReqErrJson(409, "domain %r already exists" % domain)
+
+            return True
+        except HttpReqErrJson as e:
             raise
         except Exception as e:
             LOG.exception("%r", e)

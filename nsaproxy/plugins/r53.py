@@ -8,9 +8,10 @@ import logging
 import os
 import re
 
+from copy import deepcopy
+
 import boto3
 
-from copy import deepcopy
 from six import iteritems
 
 from dwho.adapters.redis import DWhoAdapterRedis
@@ -58,6 +59,8 @@ RRSET_CONTENT_KEYS = ('AliasTarget',
                       #'Type',
                       'Weight')
 
+RRSET_TYPES_NODEL = ('NS', 'SOA')
+
 #logging.getLogger('requests').setLevel(logging.WARNING)
 
 
@@ -88,64 +91,6 @@ class NSAProxyR53Plugin(NSAProxyApiBase):
     def at_start(self):
         if self.PLUGIN_NAME in APIS_SYNC:
             self.start()
-
-    def _find_domain(self, name):
-        res = self.conn.list_hosted_zones_by_name(DNSName  = name,
-                                                  MaxItems = '1')
-        if not res or not res['HostedZones']:
-            return None
-
-        for row in res['HostedZones']:
-            if row['Name'].rstrip('.') == name:
-                return row
-
-        return None
-
-    def _do_create_hosted_zone(self, obj):
-        args   = obj.get_args()
-        zoneid = args['name'].rstrip('.')
-
-        if self._is_excluded_zone(zoneid):
-            return None
-
-        res    = self._find_domain(zoneid)
-        if res:
-            self.adapter_redis.set_key(self._keyname_zone(zoneid),
-                                       res['Id'])
-        else:
-            r = self.conn.create_hosted_zone(Name            = args['name'],
-                                             CallerReference = obj.get_uid())
-            self.adapter_redis.set_key(self._keyname_zone(zoneid),
-                                       r['HostedZone']['Id'])
-
-            if 'DelegationSet' in r and 'NameServers' in r['DelegationSet']:
-                return {'nameservers': r['DelegationSet']['NameServers']}
-
-        return None
-
-    def _do_delete_hosted_zone(self, obj):
-        params = obj.get_params()
-        zoneid = params['id'].rstrip('.')
-
-        if self._is_excluded_zone(zoneid):
-            return
-
-        xid    = self.adapter_redis.get_key(self._keyname_zone(zoneid))
-        if not xid:
-            res = self._find_domain(zoneid)
-            if res:
-                xid = res['Id']
-            else:
-                LOG.warning("unable to find zone id: %r", zoneid)
-                return
-
-        try:
-            self.conn.delete_hosted_zone(Id = xid)
-        except self.conn.exceptions.NoSuchHostedZone:
-            pass
-
-        self.adapter_redis.del_key(self._keyname_zone(zoneid))
-        self.adapter_redis.del_key(self._keyname_rrsets(zoneid))
 
     @staticmethod
     def _tags_from_comment(comment):
@@ -197,6 +142,97 @@ class NSAProxyR53Plugin(NSAProxyApiBase):
                                          'HostedZoneId': None,
                                          'EvaluateTargetHealth': False},
                                       'Type': rtype}}
+
+
+    @staticmethod
+    def _init_changes_obj():
+        return {'Comment': '',
+                'Changes': []}
+
+    def _find_domain(self, name):
+        res = self.conn.list_hosted_zones_by_name(DNSName  = name,
+                                                  MaxItems = '1')
+        if not res or not res['HostedZones']:
+            return None
+
+        for row in res['HostedZones']:
+            if row['Name'].rstrip('.') == name:
+                return row
+
+        return None
+
+    def _do_create_hosted_zone(self, obj):
+        args   = obj.get_args()
+        zoneid = args['name'].rstrip('.')
+
+        if self._is_excluded_zone(zoneid):
+            return None
+
+        res    = self._find_domain(zoneid)
+        if res:
+            self.adapter_redis.set_key(self._keyname_zone(zoneid),
+                                       res['Id'])
+        else:
+            r = self.conn.create_hosted_zone(Name            = args['name'],
+                                             CallerReference = obj.get_uid())
+            self.adapter_redis.set_key(self._keyname_zone(zoneid),
+                                       r['HostedZone']['Id'])
+
+            if 'DelegationSet' in r and 'NameServers' in r['DelegationSet']:
+                return {'nameservers': r['DelegationSet']['NameServers']}
+
+        return None
+
+    def _do_delete_all_rrsets(self, xid):
+        res = self.conn.list_resource_record_sets(HostedZoneId = xid)
+        if not res or not res['ResourceRecordSets']:
+            return
+
+        changes = self._init_changes_obj()
+
+        for record in res['ResourceRecordSets']:
+            if record['Type'] in RRSET_TYPES_NODEL:
+                continue
+
+            changes['Changes'].append({'Action': 'DELETE',
+                                       'ResourceRecordSet': record})
+
+        if changes['Changes']:
+            self.conn.change_resource_record_sets(HostedZoneId = xid,
+                                                  ChangeBatch  = changes)
+            if res['IsTruncated']:
+                self._do_delete_all_rrsets(xid)
+
+    def _do_delete_hosted_zone(self, obj):
+        params = obj.get_params()
+        zoneid = params['id'].rstrip('.')
+
+        if self._is_excluded_zone(zoneid):
+            return
+
+        xid    = self.adapter_redis.get_key(self._keyname_zone(zoneid))
+        if not xid:
+            res = self._find_domain(zoneid)
+            if res:
+                xid = res['Id']
+            else:
+                LOG.warning("unable to find zone id: %r", zoneid)
+                return
+
+        try:
+            self.conn.delete_hosted_zone(Id = xid)
+        except self.conn.exceptions.NoSuchHostedZone:
+            pass
+        except self.conn.exceptions.HostedZoneNotEmpty:
+            self._do_delete_all_rrsets(xid)
+
+        try:
+            self.conn.delete_hosted_zone(Id = xid)
+        except self.conn.exceptions.NoSuchHostedZone:
+            pass
+
+        self.adapter_redis.del_key(self._keyname_zone(zoneid))
+        self.adapter_redis.del_key(self._keyname_rrsets(zoneid))
 
     def _add_rrset(self, action, changes, rtype, rrset, rrsets, nrrsets):
         change = self._get_rrset_obj(rtype, rrset)
@@ -285,8 +321,7 @@ class NSAProxyR53Plugin(NSAProxyApiBase):
                                        xid)
 
         args    = obj.get_args()
-        changes = {'Comment': '',
-                   'Changes': []}
+        changes = self._init_changes_obj()
 
         nrrsets = []
         rrsets  = self.adapter_redis.get_key(self._keyname_rrsets(zoneid)) or []
