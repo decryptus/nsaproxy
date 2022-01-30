@@ -1,0 +1,5 @@
+- name: '@'
+  type: 'MX'
+  ttl: 300
+  records:
+    - content: '1000 0.0.0.0'

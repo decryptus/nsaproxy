@@ -7,4 +7,4 @@ PyYAML>=3.10
 redis>=2.4.0
 requests
 six>=1.13.0
-sonicprobe>=0.3.44
+sonicprobe>=0.3.45

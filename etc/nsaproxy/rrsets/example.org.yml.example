@@ -1,0 +1,17 @@
+- name: ['@', '*']
+  type: 'CAA'
+  ttl: 300
+  records:
+    - content: '0 issue "comodoca.com"'
+    - content: '0 issue "digicert.com"'
+    - content: '0 issue "letsencrypt.org"'
+    - content: '0 issue "sectigo.com"'
+    - content: '0 issue "trust-provider.com"'
+    - content: '0 issue "usertrust.com"'
+- name: 'foo'
+  type: 'A'
+  ttl: 600
+  records:
+    - content: '192.0.2.1'
+  comments:
+    - content: 'example for documentation'
