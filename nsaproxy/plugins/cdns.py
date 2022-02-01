@@ -7,6 +7,8 @@ import json
 import logging
 import os
 
+from six import iteritems
+
 from dwho.adapters.redis import DWhoAdapterRedis
 from dwho.classes.plugins import PLUGINS
 from sonicprobe import helpers
@@ -39,8 +41,9 @@ class NSAProxyCdnsPlugin(NSAProxyApiBase):
             if not cred:
                 raise ValueError("unable to read credentials")
 
-            for k, v in cred['cdnetworks'].iteritems():
-                os.environ[k.upper()] = v
+            for k, v in iteritems(cred['cdnetworks']):
+                if v:
+                    os.environ[k.upper()] = v
 
         self.conn = cdnetworks.service('cdns')
 

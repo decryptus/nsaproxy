@@ -1,0 +1,10 @@
+version: '3.2'
+services:
+  nsaproxy:
+    image: decryptus/nsaproxy:latest
+    container_name: nsaproxy
+    ports:
+      - '8670:8670'
+    volumes:
+      - './etc/nsaproxy/credentials.yml.example:/etc/nsaproxy/credentials.yml:ro'
+      - './etc/nsaproxy/nsaproxy.yml.example:/etc/nsaproxy/nsaproxy.yml:ro'

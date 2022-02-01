@@ -82,7 +82,8 @@ class NSAProxyR53Plugin(NSAProxyApiBase):
                 raise ValueError("unable to read credentials")
 
             for k, v in iteritems(cred['route53']):
-                os.environ[k.upper()] = v
+                if v:
+                    os.environ[k.upper()] = v
 
         self.conn = boto3.client('route53')
 

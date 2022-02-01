@@ -18,7 +18,7 @@ import_modules:
 #    default:
 #      import_rrsets: rrsets/default.yml.example
 #    example.org:
-#      import_rrsets: rrsets/exemple.org.yml.example
+#      import_rrsets: rrsets/example.org.yml.example
 #  soa:
 #    default:
 #      content: '%(nameserver.0)s %(email_address)s 0 7200 900 604800 300'
