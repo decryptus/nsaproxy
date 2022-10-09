@@ -17,7 +17,7 @@ from six import itervalues, string_types
 from dwho.classes.modules import DWhoModuleBase, MODULES
 from sonicprobe import helpers
 from sonicprobe.libs import network, urisup, xys
-from sonicprobe.libs.moresynchro import RWLock
+from sonicprobe.libs.moresynchro import ListLock, RWLock
 from httpdis.ext.httpdis_json import HttpReqErrJson, HttpResponseJson
 
 from ..classes.apis import NSAProxyApiObject, APIS_SYNC
@@ -46,6 +46,7 @@ class PDNSModule(DWhoModuleBase):
     MODULE_NAME     = 'pdns'
 
     LOCK            = RWLock()
+    ZONELOCK        = ListLock()
 
     def __init__(self):
         DWhoModuleBase.__init__(self)
@@ -74,6 +75,22 @@ class PDNSModule(DWhoModuleBase):
                 raise ValueError("unable to find pdn api key")
 
             self.api_key = cred['pdns']['api_key']
+
+    def _lock(self, endpoint, zone_id, lock_func = None):
+        if not lock_func:
+            lock_func = self.LOCK.acquire_read
+
+        if endpoint == 'zones' and zone_id:
+            zone_id = zone_id.rstrip('.')
+            if self.ZONELOCK.try_acquire(zone_id):
+                raise HttpReqErrJson(503, "unable to take ZONELOCK(%r)" % zone_id)
+
+            return (self.ZONELOCK.release, [zone_id])
+
+        if not lock_func(self.lock_timeout):
+            raise HttpReqErrJson(503, "unable to take LOCK for reading after %s seconds" % self.lock_timeout)
+
+        return (self.LOCK.release, [])
 
     @staticmethod
     def _add_record(content):
@@ -257,8 +274,9 @@ class PDNSModule(DWhoModuleBase):
         if not xys.validate(params, self.ENDPOINT_GET_QSCHEMA):
             raise HttpReqErrJson(415, "invalid arguments for command")
 
-        if not self.LOCK.acquire_read(self.lock_timeout):
-            raise HttpReqErrJson(503, "unable to take LOCK for reading after %s seconds" % self.lock_timeout)
+        (lock_release_func,
+         lock_release_args) = self._lock(params['endpoint'],
+                                         params.get('id'))
 
         try:
             return self._do_response(request, params)
@@ -267,15 +285,17 @@ class PDNSModule(DWhoModuleBase):
         except Exception as e:
             LOG.exception("%r", e)
         finally:
-            self.LOCK.release()
+            lock_release_func(*lock_release_args)
+
+        return None
 
 
     ENDPOINT_PUT_QSCHEMA = xys.load("""
-    server_id:    !!str
-    endpoint:     !!str
-    id:           !!str
-    command*:     !~~enum(axfr-retrieve,notify,rectify)
-    domain*:      !!str
+    server_id: !!str
+    endpoint:  !!str
+    id:        !!str
+    command*:  !~~enum(axfr-retrieve,notify,rectify)
+    domain*:   !!str
     """)
 
     def api_endpoint_put(self, request):
@@ -289,8 +309,9 @@ class PDNSModule(DWhoModuleBase):
         if not xys.validate(params, self.ENDPOINT_PUT_QSCHEMA):
             raise HttpReqErrJson(415, "invalid arguments for command")
 
-        if not self.LOCK.acquire_read(self.lock_timeout):
-            raise HttpReqErrJson(503, "unable to take LOCK for reading after %s seconds" % self.lock_timeout)
+        (lock_release_func,
+         lock_release_args) = self._lock(params['endpoint'],
+                                         params['id'])
 
         try:
             return self._do_response(request, params)
@@ -299,19 +320,21 @@ class PDNSModule(DWhoModuleBase):
         except Exception as e:
             LOG.exception("%r", e)
         finally:
-            self.LOCK.release()
+            lock_release_func(*lock_release_args)
+
+        return None
 
 
     ENDPOINT_POST_QSCHEMA = xys.load("""
-    server_id?:   !!str
-    endpoint?:    !!str
+    server_id: !!str
+    endpoint:  !~~enum(zones)
     """)
 
     ENDPOINT_POST_PSCHEMA = xys.load("""
     nameservers?:  [ !~~callback(pdns.domain) ]
     masters?:      [ !~~callback(pdns.ipaddr) ]
-    kind?:         !~~ienum(native,master,primary,slave,secondary)
-    name?:         !~~callback(pdns.domain)
+    kind:          !~~ienum(native,master,primary,slave,secondary)
+    name:          !~~callback(pdns.domain)
     account?:      !!str
     soa_edit_api?: !~~enum(DEFAULT,INCREASE,INCEPTION-INCREMENT,EPOCH,INCEPTION-EPOCH)
     """)
@@ -334,13 +357,12 @@ class PDNSModule(DWhoModuleBase):
         if not xys.validate(args, self.ENDPOINT_POST_PSCHEMA):
             raise HttpReqErrJson(415, "invalid arguments for command payload parameters")
 
-        if not self.LOCK.acquire_write(self.lock_timeout):
-            raise HttpReqErrJson(503, "unable to take LOCK for writing after %s seconds" % self.lock_timeout)
+        (lock_release_func,
+         lock_release_args) = self._lock(params['endpoint'],
+                                         args['name'],
+                                         self.LOCK.acquire_write)
 
         try:
-            if params.get('endpoint') != 'zones':
-                raise HttpReqErrJson(400, "invalid request")
-
             has_rrsets = False
             domain_name = args['name'].rstrip('.')
 
@@ -396,13 +418,15 @@ class PDNSModule(DWhoModuleBase):
         except Exception as e:
             LOG.exception("%r", e)
         finally:
-            self.LOCK.release()
+            lock_release_func(*lock_release_args)
+
+        return None
 
 
     ENDPOINT_PATCH_QSCHEMA = xys.load("""
-    server_id:    !!str
-    endpoint:     !!str
-    id:           !!str
+    server_id: !!str
+    endpoint:  !~~enum(zones)
+    id:        !!str
     """)
 
     ENDPOINT_PATCH_PSCHEMA = xys.load("""
@@ -443,13 +467,12 @@ class PDNSModule(DWhoModuleBase):
         if not xys.validate(args, self.ENDPOINT_PATCH_PSCHEMA):
             raise HttpReqErrJson(415, "invalid arguments for command payload parameters")
 
-        if not self.LOCK.acquire_write(self.lock_timeout):
-            raise HttpReqErrJson(503, "unable to take LOCK for writing after %s seconds" % self.lock_timeout)
+        (lock_release_func,
+         lock_release_args) = self._lock(params['endpoint'],
+                                         params['id'],
+                                         self.LOCK.acquire_write)
 
         try:
-            if params.get('endpoint') != 'zones':
-                raise HttpReqErrJson(400, "invalid request")
-
             if not args.get('rrsets'):
                 return self._do_response(request, None, args)
 
@@ -468,13 +491,15 @@ class PDNSModule(DWhoModuleBase):
         except Exception as e:
             LOG.exception("%r", e)
         finally:
-            self.LOCK.release()
+            lock_release_func(*lock_release_args)
+
+        return None
 
 
     ENDPOINT_DELETE_QSCHEMA = xys.load("""
-    server_id:   !!str
-    endpoint:    !!str
-    id:          !!str
+    server_id: !!str
+    endpoint:  !~~enum(zones)
+    id:        !!str
     """)
 
     def api_endpoint_delete(self, request):
@@ -488,13 +513,12 @@ class PDNSModule(DWhoModuleBase):
         if not xys.validate(params, self.ENDPOINT_DELETE_QSCHEMA):
             raise HttpReqErrJson(415, "invalid arguments for command for query parameters")
 
-        if not self.LOCK.acquire_write(self.lock_timeout):
-            raise HttpReqErrJson(503, "unable to take LOCK for writing after %s seconds" % self.lock_timeout)
+        (lock_release_func,
+         lock_release_args) = self._lock(params['endpoint'],
+                                         params['id'],
+                                         self.LOCK.acquire_write)
 
         try:
-            if params.get('endpoint') != 'zones':
-                raise HttpReqErrJson(400, "invalid request")
-
             uids = self._push_apis_sync('delete_hosted_zone', params)
             if not uids:
                 raise HttpReqErrJson(500, "unable to retrieve uids")
@@ -509,7 +533,9 @@ class PDNSModule(DWhoModuleBase):
         except Exception as e:
             LOG.exception("%r", e)
         finally:
-            self.LOCK.release()
+            lock_release_func(*lock_release_args)
+
+        return None
 
 
     ENDPOINT_VALIDATE_QSCHEMA = xys.load("""
@@ -560,6 +586,8 @@ class PDNSModule(DWhoModuleBase):
             LOG.exception("%r", e)
         finally:
             self.LOCK.release()
+
+        return False
 
 
 if __name__ != "__main__":

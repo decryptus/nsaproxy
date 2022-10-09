@@ -29,9 +29,9 @@ class NSAProxyCdnsPlugin(NSAProxyApiBase):
 
     # pylint: disable-msg=attribute-defined-outside-init
     def safe_init(self):
-        self.conn           = None
+        self.conn = None
 
-        if self.PLUGIN_NAME not in self.config['plugins']:
+        if not self.plugconf:
             return
 
         self.adapter_redis  = DWhoAdapterRedis(self.config, prefix = 'nsaproxy')
@@ -150,13 +150,13 @@ class NSAProxyCdnsPlugin(NSAProxyApiBase):
 
         xid     = self.adapter_redis.get_key(self._keyname_zone(zoneid))
         if not xid:
-            domains = self.conn.search_domains(zoneid)
-            if not domains \
-               or 'domains' not in domains \
-               or not domains['domains'].get('domains'):
+            zones = self.conn.search_zones(zoneid)
+            if not zones \
+               or 'data' not in zones \
+               or not zones['data'].get('results'):
                 raise LookupError("unable to find zone id: %r" % zoneid)
             self.adapter_redis.set_key(self._keyname_zone(zoneid),
-                                       domains['domains']['domains'][0]['domain_id'])
+                                       zones['data']['results'][0]['zoneId'])
 
         xid     = self.adapter_redis.get_key(self._keyname_zone(zoneid))
         if not xid:
@@ -188,15 +188,15 @@ class NSAProxyCdnsPlugin(NSAProxyApiBase):
                 action = rrset['changetype'].lower()
 
             if rrset['changetype'] == 'DELETE':
-                changes.append({'action':      'purge',
-                                'host_name':   name,
-                                'record_type': rrset['type']})
+                changes.append({'action': 'purge',
+                                'hostName': name,
+                                'type': rrset['type']})
                 continue
 
             for record in rrset['records']:
-                change = {'host_name':   name,
-                          'ttl':         rrset.get('ttl') or 0,
-                          'record_type': rrset['type']}
+                change = {'hostName': name,
+                          'ttl': rrset.get('ttl') or 0,
+                          'type': rrset['type']}
 
                 change.update(self._build_record_value(zoneid, rrset['type'], record['content']))
                 nrrsets.append(change.copy())
@@ -214,8 +214,8 @@ class NSAProxyCdnsPlugin(NSAProxyApiBase):
         if changes:
             self.conn.change_records(xid,
                                      changes,
-                                     deploy_type = self.config['plugins'][self.PLUGIN_NAME].get('deployment'),
-                                     force       = True)
+                                     deployment = self.plugconf.get('deployment'),
+                                     force      = True)
         self.adapter_redis.set_key(self._keyname_rrsets(zoneid),
                                    json.dumps(nrrsets))
 

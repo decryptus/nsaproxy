@@ -8,11 +8,12 @@ import logging
 import os
 import re
 
+from codecs import escape_decode
 from copy import deepcopy
 
 import boto3
 
-from six import iteritems
+from six import iteritems, iterkeys
 
 from dwho.adapters.redis import DWhoAdapterRedis
 from dwho.classes.plugins import PLUGINS
@@ -23,14 +24,16 @@ from ..classes.apis import NSAProxyApiBase, NSAProxyApiSync, APIS_SYNC
 
 LOG = logging.getLogger('nsaproxy.plugins.r53')
 
-RE_COMMENT_TAGS_FINDALL = re.compile(r'(\w+=\w+)').findall
+R53_CONTINENT_CODES = ('AF', 'AN', 'AS', 'EU', 'OC', 'NA', 'SA')
+
+RE_COMMENT_TAGS_FINDALL = re.compile(r'(\w+=[\w\-]+(?:,+[\w\-]+)*)').findall
 RE_COMMENT_TAGS = {'ContinentCode':
                      {'parent': 'GeoLocation',
-                      'regex': re.compile(r'CONC=(?P<ContinentCode>[A-Z]{2})$').match,
-                      'sanitize': str},
+                      'regex': re.compile(r'CO(?:NC)?=(?P<ContinentCode>[A-Z]{2})$').match,
+                      'sanitize': lambda x: '*' if x == 'default' else x},
                    'CountryCode':
                      {'parent': 'GeoLocation',
-                      'regex': re.compile(r'COYC=(?P<CountryCode>[A-Z]{1,2}|default)$').match,
+                      'regex': re.compile(r'CO(?:YC)?=(?P<CountryCode>[A-Z]{1,2}|default)$').match,
                       'sanitize': lambda x: '*' if x == 'default' else x},
                    'EvaluateTargetHealth':
                      {'parent': 'AliasTarget',
@@ -42,7 +45,7 @@ RE_COMMENT_TAGS = {'ContinentCode':
                       'sanitize': str},
                    'SetIdentifier':
                      {'parent': None,
-                      'regex': re.compile(r'^ID=(?P<SetIdentifier>[a-zA-Z0-9]+)$').match,
+                      'regex': re.compile(r'^ID=(?P<SetIdentifier>[a-zA-Z0-9\-]+)$').match,
                       'sanitize': str}}
 
 RRSET_CONTENT_KEYS = ('AliasTarget',
@@ -71,7 +74,7 @@ class NSAProxyR53Plugin(NSAProxyApiBase):
     def safe_init(self):
         self.conn           = None
 
-        if self.PLUGIN_NAME not in self.config['plugins']:
+        if not self.plugconf:
             return
 
         self.adapter_redis  = DWhoAdapterRedis(self.config, prefix = 'nsaproxy')
@@ -82,8 +85,7 @@ class NSAProxyR53Plugin(NSAProxyApiBase):
                 raise ValueError("unable to read credentials")
 
             for k, v in iteritems(cred['route53']):
-                if v:
-                    os.environ[k.upper()] = v
+                os.environ[k.upper()] = v
 
         self.conn = boto3.client('route53')
 
@@ -94,8 +96,17 @@ class NSAProxyR53Plugin(NSAProxyApiBase):
             self.start()
 
     @staticmethod
+    def _escape_decode_record_name(name):
+        return escape_decode(name)[0].decode('utf8')
+
+    @staticmethod
     def _tags_from_comment(comment):
-        r = {}
+        r = []
+        entries = {}
+
+        xkeys = {'EvaluateTargetHealth': None,
+                 'HostedZoneId': None,
+                 'SetIdentifier': None}
 
         if not comment.get('content'):
             return r
@@ -104,19 +115,70 @@ class NSAProxyR53Plugin(NSAProxyApiBase):
         if not tags:
             return r
 
+        xtags = list(tags)
+        xid = False
+        xco = None
+
         for tag in tags:
-            for k, v in iteritems(RE_COMMENT_TAGS):
-                m = v['regex'](tag)
-                if not m:
+            if tag.startswith('ID='):
+                break
+            if tag.startswith('CO='):
+                xco = tag
+
+        if not xid and xco:
+            tags.append("ID=%s" % xco[3:])
+
+        for tag in tags:
+            c = None
+            for i, x in enumerate(tag.strip(',').split(',')):
+                for k, v in iteritems(RE_COMMENT_TAGS):
+                    if c and '=' not in x:
+                        f = "%s=%s" % (c, x)
+                    else:
+                        f = x
+
+                    m = v['regex'](f)
+                    if not m:
+                        continue
+
+                    value = v['sanitize'](m.group(1))
+                    if k in ('ContinentCode', 'CountryCode'):
+                        if value in R53_CONTINENT_CODES:
+                            k = 'ContinentCode'
+                        else:
+                            k = 'CountryCode'
+
+                    if not c and '=' in x:
+                        c = x.split('=', 1)[0]
+
+                    if k in xkeys:
+                        xkeys[k] = value
+
+                    if not i in entries:
+                        entries[i] = {}
+
+                    if not v.get('parent'):
+                        entries[i][k] = value
+                    else:
+                        if v['parent'] not in entries[i]:
+                            entries[i][v['parent']] = {}
+
+                        entries[i][v['parent']][k] = value
+
+        for entry in entries.values():
+            for x in iterkeys(xkeys):
+                if RE_COMMENT_TAGS[x].get('parent'):
+                    parent = RE_COMMENT_TAGS[x].get('parent')
+                    if not entry.get(parent):
+                        entry[parent] = {}
+                    if x not in entry[parent]:
+                        entry[parent][x] = xkeys[x]
                     continue
 
-                if not v.get('parent'):
-                    r[k] = v['sanitize'](m.group(1))
-                    continue
+                if x not in entry:
+                    entry[x] = xkeys[x]
 
-                if v['parent'] not in r:
-                    r[v['parent']] = {}
-                r[v['parent']][k] = v['sanitize'](m.group(1))
+            r.append(entry)
 
         return r
 
@@ -258,23 +320,26 @@ class NSAProxyR53Plugin(NSAProxyApiBase):
 
     def _add_aliases_rrset(self, action, changes, rtype, rrset, rrsets, nrrsets):
         for i, record in enumerate(rrset['records']):
-            change = self._get_rrset_obj(rtype, rrset)
-
             if not rrset.get('comments') or len(rrset['comments']) < i:
                 raise ValueError("missing comments for ALIAS entry: %r" % record['content'])
 
             tags = self._tags_from_comment(rrset['comments'][i])
-            if not tags or not tags.get('AliasTarget') or not tags['AliasTarget'].get('HostedZoneId'):
-                raise ValueError("missing HostedZoneId tag for ALIAS entry: %r" % record['content'])
+            if not tags:
+                raise ValueError("missing comment tag for ALIAS entry: %r" % record['content'])
 
-            change['ResourceRecordSet'] = helpers.merge(tags, change['ResourceRecordSet'])
-            change['ResourceRecordSet']['AliasTarget']['DNSName'] = record['content']
+            for item in tags:
+                if not item or not item.get('AliasTarget') or not item['AliasTarget'].get('HostedZoneId'):
+                    raise ValueError("missing HostedZoneId tag for ALIAS entry: %r" % record['content'])
 
-            nrrsets.append(change.copy())
+                change = self._get_rrset_obj(rtype, rrset)
+                change['ResourceRecordSet'] = helpers.merge(item, deepcopy(change['ResourceRecordSet']))
+                change['ResourceRecordSet']['AliasTarget']['DNSName'] = record['content']
 
-            if not self._is_in_cache(rrsets, change):
-                change['Action'] = action
-                changes['Changes'].append(change)
+                nrrsets.append(change.copy())
+
+                if not self._is_in_cache(rrsets, change):
+                    change['Action'] = action
+                    changes['Changes'].append(change)
 
     def _del_rrset(self, xid, changes, rtype, rrset):
         change = self._get_rrset_obj(rtype, rrset)
@@ -294,7 +359,38 @@ class NSAProxyR53Plugin(NSAProxyApiBase):
         change['Action'] = 'DELETE'
 
         for record in res['ResourceRecordSets']:
-            if record['Type'] != rtype or record['Name'] != rrset['name']:
+            if record['Type'] != rtype \
+               or self._escape_decode_record_name(record['Name']) != rrset['name']:
+                continue
+
+            nchange = deepcopy(change)
+            for x in RRSET_CONTENT_KEYS:
+                if x in record:
+                    nchange['ResourceRecordSet'][x] = record[x]
+
+            changes['Changes'].append(nchange)
+
+    def _del_aliases_rrset(self, xid, changes, rtype, rrset, rrsets):
+        change = self._get_rrset_obj(rtype, rrset)
+
+        if rrsets:
+            max_items = str(len(rrsets))
+        elif rrset.get('records'):
+            max_items = str(len(rrset['records']))
+        else:
+            max_items = '1'
+
+        res = self.conn.list_resource_record_sets(HostedZoneId    = xid,
+                                                  StartRecordName = rrset['name'],
+                                                  StartRecordType = rtype)
+        if not res or not res['ResourceRecordSets']:
+            return
+
+        change['Action'] = 'DELETE'
+
+        for record in res['ResourceRecordSets']:
+            if record['Type'] != rtype \
+               or self._escape_decode_record_name(record['Name']) != rrset['name']:
                 continue
 
             nchange = deepcopy(change)
@@ -340,7 +436,10 @@ class NSAProxyR53Plugin(NSAProxyApiBase):
                 rtype = 'A'
 
             if rrset['changetype'] == 'DELETE':
-                self._del_rrset(xid, changes, rtype, rrset)
+                if rrset['type'] != 'ALIAS':
+                    self._del_rrset(xid, changes, rtype, rrset)
+                else:
+                    self._del_aliases_rrset(xid, changes, rtype, rrset, rrsets)
             else:
                 if rrset['changetype'] == 'REPLACE':
                     action = 'UPSERT'
