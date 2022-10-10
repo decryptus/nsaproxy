@@ -82,7 +82,7 @@ class PDNSModule(DWhoModuleBase):
 
         if endpoint == 'zones' and zone_id:
             zone_id = zone_id.rstrip('.')
-            if self.ZONELOCK.try_acquire(zone_id):
+            if not self.ZONELOCK.try_acquire(zone_id):
                 raise HttpReqErrJson(503, "unable to take ZONELOCK(%r)" % zone_id)
 
             return (self.ZONELOCK.release, [zone_id])
