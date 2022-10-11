@@ -17,7 +17,8 @@ from six import itervalues, string_types
 from dwho.classes.modules import DWhoModuleBase, MODULES
 from sonicprobe import helpers
 from sonicprobe.libs import network, urisup, xys
-from sonicprobe.libs.moresynchro import ListLock, RWLock
+from sonicprobe.libs.moresynchro import RWLock
+from sonicprobe.libs.keystore import Keystore
 from httpdis.ext.httpdis_json import HttpReqErrJson, HttpResponseJson
 
 from ..classes.apis import NSAProxyApiObject, APIS_SYNC
@@ -46,7 +47,7 @@ class PDNSModule(DWhoModuleBase):
     MODULE_NAME     = 'pdns'
 
     LOCK            = RWLock()
-    ZONELOCK        = ListLock()
+    ZONELOCK        = Keystore()
 
     def __init__(self):
         DWhoModuleBase.__init__(self)
@@ -82,7 +83,7 @@ class PDNSModule(DWhoModuleBase):
 
         if endpoint == 'zones' and zone_id:
             zone_id = zone_id.rstrip('.')
-            if not self.ZONELOCK.try_acquire(zone_id):
+            if not self.ZONELOCK.try_acquire(zone_id, self.lock_timeout):
                 raise HttpReqErrJson(503, "unable to take ZONELOCK(%r)" % zone_id)
 
             return (self.ZONELOCK.release, [zone_id])
