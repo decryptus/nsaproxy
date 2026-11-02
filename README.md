@@ -21,3 +21,6 @@ pip install nsaproxy
 ### Running foreground
 
 `nsaproxy -f -c <conffile> -p <pidfile> --logfile <logfile>`
+
+See [configuration validation](docs/configuration-validation.md) for YAML schema
+coverage and compatibility.

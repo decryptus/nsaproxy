@@ -17,6 +17,7 @@ from dwho.config import import_conf_files, init_modules, init_plugins, parse_con
 from httpdis.httpdis import get_default_options
 from mako.template import Template
 from sonicprobe.helpers import load_yaml
+from nsaproxy.classes.configuration_schema import validate_configuration, validate_component
 
 _TPL_IMPORTS = ('from os import environ as ENV',
                 'from sonicprobe.helpers import to_yaml as my')
@@ -43,12 +44,12 @@ def load_conf(xfile, options = None, envvar = None):
 
     if os.path.exists(xfile):
         with open(xfile, 'r') as f:
-            conf = parse_conf(load_yaml(f))
+            conf = parse_conf(validate_configuration(load_yaml(f)))
 
         conf['_config_directory'] = os.path.dirname(os.path.abspath(xfile))
     elif envvar and os.environ.get(envvar):
         c = StringIO(os.environ[envvar])
-        conf = parse_conf(load_yaml(c.getvalue()))
+        conf = parse_conf(validate_configuration(load_yaml(c.getvalue())))
         c.close()
         conf['_config_directory'] = None
 
@@ -73,9 +74,9 @@ def load_conf(xfile, options = None, envvar = None):
                     append_func = getattr(cfg[x], 'update')
 
                 if domain_cfg.get("import_%s" % x):
-                    append_func(import_file(domain_cfg["import_%s" % x],
-                                            conf['_config_directory'],
-                                            cfg))
+                    append_func(validate_component(
+                        import_file(domain_cfg["import_%s" % x],
+                                    conf['_config_directory'], cfg), x))
 
                 if x in domain_cfg:
                     append_func(domain_cfg[x])
