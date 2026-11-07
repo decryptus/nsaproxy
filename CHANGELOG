@@ -1,3 +1,9 @@
+nsaproxy (0.1.59) unstable; urgency=medium
+
+  * Require HTTPdis 0.7.1 or later.
+
+ -- Codex <codex@openai.com>  Sat, 07 Nov 2026 09:16:00 +0100
+
 nsaproxy (0.1.58) unstable; urgency=medium
 
   * Release version: 0.1.58.
