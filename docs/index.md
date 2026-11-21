@@ -6,3 +6,4 @@
    :caption: Configuration
 
    configuration-validation
+   release-0.1.60

@@ -1,0 +1,11 @@
+[build-system]
+requires = [
+  "setuptools>=40.8,<45; python_version < '3'",
+  "setuptools>=40.8,<51; python_version >= '3' and python_version < '3.6'",
+  "setuptools>=40.8,<60; python_version >= '3.6' and python_version < '3.8'",
+  "setuptools>=68,<81; python_version >= '3.8'",
+  "wheel<0.35; python_version < '3.6'",
+  "wheel; python_version >= '3.6'",
+  "PyYAML>=3.10"
+]
+build-backend = "setuptools.build_meta"

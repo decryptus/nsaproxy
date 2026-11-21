@@ -1,0 +1,2 @@
+include requirements.txt setup.yml VERSION RELEASE README.md LICENSE CHANGELOG
+recursive-include etc *.yml *.example
