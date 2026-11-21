@@ -1,3 +1,16 @@
+nsaproxy (0.1.60) unstable; urgency=medium
+
+  * Require Sonicprobe 0.3.66 for outgoing mail headers.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Sat, 21 Nov 2026 21:35:00 +0100
+
+nsaproxy (0.1.60) stable; urgency=medium
+
+  * Require Sonicprobe 0.3.66 for missing outgoing Date and Message-ID headers.
+  * Align dependency constraints and compatibility checks with the published library.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Sat, 21 Nov 2026 21:35:00 +0100
+
 nsaproxy (0.1.59) unstable; urgency=medium
 
   * Require HTTPdis 0.7.1 or later.
