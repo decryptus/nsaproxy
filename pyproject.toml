@@ -6,6 +6,6 @@ requires = [
   "setuptools>=68,<81; python_version >= '3.8'",
   "wheel<0.35; python_version < '3.6'",
   "wheel; python_version >= '3.6'",
-  "PyYAML>=3.10"
+  "PyYAML>=6.0.4"
 ]
 build-backend = "setuptools.build_meta"
