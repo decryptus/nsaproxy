@@ -3,7 +3,7 @@ name: nsaproxy
 description: nsaproxy
 author: Adrien Delle Cave
 author_email: pypi@doowan.net
-copyright: '2022 fjord-technologies'
+copyright: '2022-2026 fjord-technologies'
 release: '0.1.60'
 version: '0.1.60'
 license: License GPL-3
