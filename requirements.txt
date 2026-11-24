@@ -1,6 +1,6 @@
 boto3>=1.4.2
 cdnetworks>=0.3.1
-dwho>=0.3.61
+dwho>=0.3.69
 httpdis>=0.7.1
 pycurl
 PyYAML>=3.10
