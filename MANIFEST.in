@@ -1,2 +1,12 @@
-include requirements.txt setup.yml VERSION RELEASE README.md LICENSE CHANGELOG
+include requirements.txt setup.yml VERSION RELEASE README.md LICENSE
 recursive-include etc *.yml *.example
+
+# Repository and maintainer material never ships in the source distribution.
+prune tests
+prune textual_tests
+prune docs
+prune scripts
+prune .github
+prune debian
+prune docker
+global-exclude __pycache__ *.py[cod]
