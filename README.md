@@ -1,16 +1,20 @@
 # nsaproxy project
 
+Full documentation: <https://nsaproxy.readthedocs.io/>
+
 ## Quickstart
 
 Using nsaproxy in Docker
 
-`docker-compose up -d`
+`docker compose up -d`
 
 See [docker-compose.yml](docker-compose.yml)
 
 ## Installation
 
+```sh
 pip install nsaproxy
+```
 
 ## Running
 
